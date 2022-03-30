@@ -9,6 +9,7 @@ import { socketSelectors } from '../Socket/Socket.selectors'
 import { arbitrumSelectors } from '../Arbitrum/ArbitrumBridge.selectors'
 import { BridgeList, BridgeTxsFilter, SupportedBridges, TokenMap } from '../EcoBridge.types'
 import { DEFAULT_TOKEN_LIST } from '../../../constants'
+import { gnosisSelectors } from '../Gnosis/Gnosis.selectors'
 
 /**
  * Each bridge declares in config which chainId pairs it supports.
@@ -192,6 +193,7 @@ export const selectBridgeTokens = createSelector([selectBridgeLists], allLists =
     },
     {}
   )
+
   return allTokens
 })
 
@@ -236,29 +238,32 @@ export const selectSupportedBridgesForUI = createSelector(
     selectSupportedBridges,
     arbitrumSelectors['arbitrum:testnet'].selectBridgingDetails,
     arbitrumSelectors['arbitrum:mainnet'].selectBridgingDetails,
+    gnosisSelectors['omnibridge:eth-xdai'].selectBridgingDetails,
     socketSelectors['socket'].selectBridgingDetails
   ],
-  (bridges, arbitrumTestnetDetails, arbitrumMainnetDetails, socketDetails) => {
+  (bridges, arbitrumTestnetDetails, arbitrumMainnetDetails, omnibridgeEthGnosisDetails, socketDetails) => {
     const bridgeNameMap = bridges.reduce<{ [bridgeId: string]: string }>((total, next) => {
       total[next.bridgeId] = next.name
       return total
     }, {})
 
-    const supportedBridges = [arbitrumMainnetDetails, arbitrumTestnetDetails, socketDetails].reduce<SupportedBridges[]>(
-      (total, bridge) => {
-        if (bridgeNameMap[bridge.bridgeId] !== undefined) {
-          total.push({
-            name: bridgeNameMap[bridge.bridgeId],
-            bridgeId: bridge.bridgeId,
-            details: ['loading', 'failed'].includes(bridge.loading) ? {} : bridge.details,
-            status: bridge.loading,
-            errorMessage: bridge.errorMessage
-          })
-        }
-        return total
-      },
-      []
-    )
+    const supportedBridges = [
+      arbitrumMainnetDetails,
+      arbitrumTestnetDetails,
+      omnibridgeEthGnosisDetails,
+      socketDetails
+    ].reduce<SupportedBridges[]>((total, bridge) => {
+      if (bridgeNameMap[bridge.bridgeId] !== undefined) {
+        total.push({
+          name: bridgeNameMap[bridge.bridgeId],
+          bridgeId: bridge.bridgeId,
+          details: ['loading', 'failed'].includes(bridge.loading) ? {} : bridge.details,
+          status: bridge.loading,
+          errorMessage: bridge.errorMessage
+        })
+      }
+      return total
+    }, [])
 
     return supportedBridges
   }
