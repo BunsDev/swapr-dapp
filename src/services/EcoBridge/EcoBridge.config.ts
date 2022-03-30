@@ -1,7 +1,8 @@
 import { ArbitrumBridge } from './Arbitrum/ArbitrumBridge'
+import { SocketBridge } from './Socket/SocketBridge'
+import { GnosisBridge } from './Gnosis/GnosisBridge'
 import { ChainId } from '@swapr/sdk'
 import { EcoBridgeChildBase } from './EcoBridge.utils'
-import { SocketBridge } from './Socket/SocketBridge'
 
 //supported chains are bidirectional
 export const ecoBridgeConfig: EcoBridgeChildBase[] = [
@@ -23,6 +24,11 @@ export const ecoBridgeConfig: EcoBridgeChildBase[] = [
       { from: ChainId.MAINNET, to: ChainId.XDAI },
       { from: ChainId.XDAI, to: ChainId.ARBITRUM_ONE }
     ]
+  }),
+  new GnosisBridge({
+    bridgeId: 'omnibridge:eth-xdai',
+    displayName: 'Gnosis',
+    supportedChains: [{ from: ChainId.XDAI, to: ChainId.MAINNET }]
   })
 ]
 
