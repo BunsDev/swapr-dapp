@@ -36,9 +36,10 @@ export interface EcoBridgeChildBaseProps
 
 export interface EcoBridgeChildBaseInit extends EcoBridgeChangeHandler, EcoBridgeInitialEnv {}
 
+export type GnosisList = 'omnibridge:eth-xdai'
 export type SocketList = 'socket'
 export type ArbitrumList = 'arbitrum:mainnet' | 'arbitrum:testnet'
-export type BridgeList = ArbitrumList | SocketList
+export type BridgeList = ArbitrumList | SocketList | GnosisList
 export type OptionalBridgeList = BridgeList | undefined
 
 export interface EcoBridgeChildBaseConstructor {
