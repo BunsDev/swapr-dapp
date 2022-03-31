@@ -116,7 +116,8 @@ export const selectBridgeListsLoadingStatus = createSelector(
   [
     (state: AppState) => state.ecoBridge['arbitrum:testnet'].listsStatus,
     (state: AppState) => state.ecoBridge['arbitrum:mainnet'].listsStatus,
-    (state: AppState) => state.ecoBridge['socket'].listsStatus
+    (state: AppState) => state.ecoBridge['socket'].listsStatus,
+    (state: AppState) => state.ecoBridge['omnibridge:eth-xdai'].listsStatus
   ],
   // Because of redux-persist initial state is undefined
   (...statuses) => statuses.some(status => ['loading', 'idle', undefined].includes(status))
@@ -127,15 +128,22 @@ export const selectBridgeLists = createSelector(
     (state: AppState) => state.ecoBridge['arbitrum:testnet'].lists,
     (state: AppState) => state.ecoBridge['arbitrum:mainnet'].lists,
     (state: AppState) => state.ecoBridge['socket'].lists,
-    (state: AppState) => state.lists.byUrl[DEFAULT_TOKEN_LIST].current
+    (state: AppState) => state.lists.byUrl[DEFAULT_TOKEN_LIST].current,
+    (state: AppState) => state.ecoBridge['omnibridge:eth-xdai'].lists
   ],
-  (tokenListTestnet, tokenListMainnet, tokenListSocket, swprDefaultList) => {
+  (tokenListTestnet, tokenListMainnet, tokenListSocket, swprDefaultList, omnibridgeEthGnosisList) => {
     // Tmp solution to add swpr token list to arbitrum bridges
     const swprListWithIds = {
       'arbitrum:testnet-swpr': swprDefaultList as TokenList,
       'arbitrum:mainnet-swpr': swprDefaultList as TokenList
     }
-    const allTokenLists = { ...swprListWithIds, ...tokenListTestnet, ...tokenListMainnet, ...tokenListSocket }
+    const allTokenLists = {
+      ...swprListWithIds,
+      ...tokenListTestnet,
+      ...tokenListMainnet,
+      ...tokenListSocket,
+      ...omnibridgeEthGnosisList
+    }
 
     return allTokenLists
   }

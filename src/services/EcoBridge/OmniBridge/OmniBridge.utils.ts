@@ -5,6 +5,11 @@ import { TokenWithAddressAndChain } from './OmniBridge.types'
 import { BRIDGE_CONFIG, OVERRIDES } from './OmniBridge.config'
 import { EcoBridgeProviders } from '../EcoBridge.types'
 
+export const defaultTokensUrl: { [chainId: number]: string } = {
+  100: 'https://tokens.honeyswap.org',
+  1: 'https://tokens.uniswap.org'
+}
+
 const ADDRESS_ZERO = ethers.constants.AddressZero
 
 //overrides
@@ -305,9 +310,11 @@ export const fetchToToken = async (
   toChainId: ChainId,
   providers?: EcoBridgeProviders
 ) => {
-  const toToken = await fetchToTokenDetails(bridgeDirection, fromToken, toChainId, providers)
-
-  return toToken
+  try {
+    return await fetchToTokenDetails(bridgeDirection, fromToken, toChainId, providers)
+  } catch (e) {
+    return
+  }
 }
 
 //calculate fee
@@ -355,26 +362,29 @@ export const checkRewardAddress = async (
 
 export const calculateFees = async (direction: string, provider?: Provider) => {
   if (!provider) return
+  try {
+    const abi = [
+      'function FOREIGN_TO_HOME_FEE() view returns (bytes32)',
+      'function HOME_TO_FOREIGN_FEE() view returns (bytes32)'
+    ]
 
-  const abi = [
-    'function FOREIGN_TO_HOME_FEE() view returns (bytes32)',
-    'function HOME_TO_FOREIGN_FEE() view returns (bytes32)'
-  ]
+    const mediatorData = await processMediatorData(direction, provider)
 
-  const mediatorData = await processMediatorData(direction, provider)
+    if (!mediatorData) return
 
-  if (!mediatorData) return
+    const { feeManagerAddress } = mediatorData
 
-  const { feeManagerAddress } = mediatorData
+    const feeManagerContract = new Contract(feeManagerAddress, abi, provider)
 
-  const feeManagerContract = new Contract(feeManagerAddress, abi, provider)
+    const [foreignToHomeFee, homeToForeignFee] = await Promise.all<string, string>([
+      feeManagerContract.FOREIGN_TO_HOME_FEE(),
+      feeManagerContract.HOME_TO_FOREIGN_FEE()
+    ])
 
-  const [foreignToHomeFee, homeToForeignFee] = await Promise.all<string, string>([
-    feeManagerContract.FOREIGN_TO_HOME_FEE(),
-    feeManagerContract.HOME_TO_FOREIGN_FEE()
-  ])
-
-  return { foreignToHomeFee, homeToForeignFee, feeManagerAddress }
+    return { foreignToHomeFee, homeToForeignFee, feeManagerAddress }
+  } catch (e) {
+    return
+  }
 }
 
 export const fetchToAmount = async (
@@ -405,7 +415,7 @@ export const fetchToAmount = async (
     const fee = await feeManagerContract.calculateFee(feeType, tokenAddress, fromAmount)
 
     return fromAmount.sub(fee)
-  } catch (amountError) {
+  } catch (e) {
     return fromAmount
   }
 }

@@ -136,13 +136,23 @@ export const createOmniBridgeSlice = (bridgeId: OmniBridgeList) =>
         action: PayloadAction<{ status: AsyncState; errorMessage?: BridgingDetailsErrorMessage }>
       ) => {
         const { status, errorMessage } = action.payload
+
         state.bridgingDetailsStatus = status
+
         if (errorMessage) {
           state.bridgingDetailsErrorMessage = errorMessage
         }
       },
       requestStarted: (state, action: PayloadAction<{ id: number }>) => {
         state.lastMetadataCt = action.payload.id
+      },
+      setTokenListsStatus: (state, action: PayloadAction<AsyncState>) => {
+        state.listsStatus = action.payload
+      },
+      addTokenLists: (state, action: PayloadAction<{ [id: string]: TokenList }>) => {
+        const { payload } = action
+
+        state.lists = payload
       }
     }
   })
