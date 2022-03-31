@@ -1,6 +1,6 @@
 import { ArbitrumBridge } from './Arbitrum/ArbitrumBridge'
 import { SocketBridge } from './Socket/SocketBridge'
-import { GnosisBridge } from './Gnosis/GnosisBridge'
+import { OmniBridge } from './OmniBridge/OmniBridge'
 import { ChainId } from '@swapr/sdk'
 import { EcoBridgeChildBase } from './EcoBridge.utils'
 
@@ -25,9 +25,9 @@ export const ecoBridgeConfig: EcoBridgeChildBase[] = [
       { from: ChainId.XDAI, to: ChainId.ARBITRUM_ONE }
     ]
   }),
-  new GnosisBridge({
+  new OmniBridge({
     bridgeId: 'omnibridge:eth-xdai',
-    displayName: 'Gnosis',
+    displayName: 'OmniBridge',
     supportedChains: [{ from: ChainId.XDAI, to: ChainId.MAINNET }]
   })
 ]

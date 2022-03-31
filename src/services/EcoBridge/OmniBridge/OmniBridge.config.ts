@@ -1,5 +1,3 @@
-import { GnosisList } from '../EcoBridge.types'
-
 type BridgeConfig = {
   label: string
   homeChainId: number

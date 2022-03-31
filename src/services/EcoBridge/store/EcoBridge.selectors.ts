@@ -9,7 +9,7 @@ import { socketSelectors } from '../Socket/Socket.selectors'
 import { arbitrumSelectors } from '../Arbitrum/ArbitrumBridge.selectors'
 import { BridgeList, BridgeTxsFilter, SupportedBridges, TokenMap } from '../EcoBridge.types'
 import { DEFAULT_TOKEN_LIST } from '../../../constants'
-import { gnosisSelectors } from '../Gnosis/Gnosis.selectors'
+import { omniBridgeSelectors } from '../OmniBridge/OmniBridge.selectors'
 
 /**
  * Each bridge declares in config which chainId pairs it supports.
@@ -238,7 +238,7 @@ export const selectSupportedBridgesForUI = createSelector(
     selectSupportedBridges,
     arbitrumSelectors['arbitrum:testnet'].selectBridgingDetails,
     arbitrumSelectors['arbitrum:mainnet'].selectBridgingDetails,
-    gnosisSelectors['omnibridge:eth-xdai'].selectBridgingDetails,
+    omniBridgeSelectors['omnibridge:eth-xdai'].selectBridgingDetails,
     socketSelectors['socket'].selectBridgingDetails
   ],
   (bridges, arbitrumTestnetDetails, arbitrumMainnetDetails, omnibridgeEthGnosisDetails, socketDetails) => {

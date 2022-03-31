@@ -6,7 +6,7 @@ import {
   EcoBridgeChangeHandler,
   EcoBridgeChildBaseConstructor,
   EcoBridgeChildBaseInit,
-  GnosisList
+  OmniBridgeList
 } from '../EcoBridge.types'
 import { EcoBridgeChildBase } from '../EcoBridge.utils'
 import {
@@ -16,10 +16,10 @@ import {
   fetchToAmount,
   fetchToToken,
   getMediatorAddress
-} from './Gnosis.utils'
-import { gnosisActions } from './GnosisBridge.reducers'
+} from './OmniBridge.utils'
+import { omniBridgeActions } from './OmniBridge.reducers'
 
-export class GnosisBridge extends EcoBridgeChildBase {
+export class OmniBridge extends EcoBridgeChildBase {
   private _homeChainId: ChainId
   private _foreignChainId: ChainId
 
@@ -29,7 +29,7 @@ export class GnosisBridge extends EcoBridgeChildBase {
   }
 
   private get actions() {
-    return gnosisActions[this.bridgeId as GnosisList]
+    return omniBridgeActions[this.bridgeId as OmniBridgeList]
   }
 
   constructor({ supportedChains: supportedChainsArr, bridgeId, displayName }: EcoBridgeChildBaseConstructor) {
@@ -71,7 +71,7 @@ export class GnosisBridge extends EcoBridgeChildBase {
         return
       }
 
-      const requestId = this.store.getState().ecoBridge[this.bridgeId as GnosisList].lastMetadataCt
+      const requestId = this.store.getState().ecoBridge[this.bridgeId as OmniBridgeList].lastMetadataCt
 
       const helperRequestId = (requestId ?? 0) + 1
 

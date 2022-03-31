@@ -1,8 +1,8 @@
 import { BigNumber, Contract, ethers, utils } from 'ethers'
 import { Provider } from '@ethersproject/abstract-provider'
 import { ChainId } from '@swapr/sdk'
-import { TokenWithAddressAndChain } from './GnosisBridge.types'
-import { BRIDGE_CONFIG, OVERRIDES } from './GnosisBridge.config'
+import { TokenWithAddressAndChain } from './OmniBridge.types'
+import { BRIDGE_CONFIG, OVERRIDES } from './OmniBridge.config'
 import { EcoBridgeProviders } from '../EcoBridge.types'
 
 const ADDRESS_ZERO = ethers.constants.AddressZero

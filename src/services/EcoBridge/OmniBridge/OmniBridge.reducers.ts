@@ -1,7 +1,7 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit'
 import { ChainId } from '@swapr/sdk'
-import { AsyncState, BridgeDetails, BridgingDetailsErrorMessage, GnosisList } from '../EcoBridge.types'
-import { BridgeTxsSummary } from './GnosisBridge.types'
+import { AsyncState, BridgeDetails, BridgingDetailsErrorMessage, OmniBridgeList } from '../EcoBridge.types'
+import { BridgeTxsSummary } from './OmniBridge.types'
 import { TokenList } from '@uniswap/token-lists'
 import { TransactionReceipt } from '@ethersproject/providers'
 
@@ -24,7 +24,7 @@ const initialState: InitialState = {
   lastMetadataCt: 0
 }
 
-export const createGnosisSlice = (bridgeId: GnosisList) =>
+export const createOmniBridgeSlice = (bridgeId: OmniBridgeList) =>
   createSlice({
     name: bridgeId,
     initialState,
@@ -147,24 +147,26 @@ export const createGnosisSlice = (bridgeId: GnosisList) =>
     }
   })
 
-const gnosisSlices = {
-  'omnibridge:eth-xdai': createGnosisSlice('omnibridge:eth-xdai')
+const omniBridgeSlices = {
+  'omnibridge:eth-xdai': createOmniBridgeSlice('omnibridge:eth-xdai')
 }
 
-type GnosisReducers = { [k in keyof typeof gnosisSlices]: ReturnType<typeof createGnosisSlice>['reducer'] }
+type OmniBridgeReducers = { [k in keyof typeof omniBridgeSlices]: ReturnType<typeof createOmniBridgeSlice>['reducer'] }
 
-type GnosisActions = { [k in keyof typeof gnosisSlices]: ReturnType<typeof createGnosisSlice>['actions'] }
+type OmniBridgeActions = { [k in keyof typeof omniBridgeSlices]: ReturnType<typeof createOmniBridgeSlice>['actions'] }
 
-type GnosisSliceExtract = {
-  gnosisReducers: GnosisReducers
-  gnosisActions: GnosisActions
+type OmniBridgeSliceExtract = {
+  omniBridgeReducers: OmniBridgeReducers
+  omniBridgeActions: OmniBridgeActions
 }
 
-export const { gnosisReducers, gnosisActions } = (Object.keys(gnosisSlices) as Array<keyof typeof gnosisSlices>).reduce(
+export const { omniBridgeReducers, omniBridgeActions } = (Object.keys(omniBridgeSlices) as Array<
+  keyof typeof omniBridgeSlices
+>).reduce(
   (total, key) => {
-    total.gnosisReducers[key] = gnosisSlices[key].reducer
-    total.gnosisActions[key] = gnosisSlices[key].actions
+    total.omniBridgeReducers[key] = omniBridgeSlices[key].reducer
+    total.omniBridgeActions[key] = omniBridgeSlices[key].actions
     return total
   },
-  { gnosisActions: {}, gnosisReducers: {} } as GnosisSliceExtract
+  { omniBridgeReducers: {}, omniBridgeActions: {} } as OmniBridgeSliceExtract
 )

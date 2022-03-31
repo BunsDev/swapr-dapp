@@ -1,8 +1,8 @@
 import { createSelector } from '@reduxjs/toolkit'
 import { AppState } from '../../../state'
-import { GnosisList } from '../EcoBridge.types'
+import { OmniBridgeList } from '../EcoBridge.types'
 
-const createSelectBridgingDetails = (bridgeId: GnosisList) =>
+const createSelectBridgingDetails = (bridgeId: OmniBridgeList) =>
   createSelector(
     [
       (state: AppState) => state.ecoBridge[bridgeId].bridgingDetails,
@@ -19,12 +19,12 @@ const createSelectBridgingDetails = (bridgeId: GnosisList) =>
     }
   )
 
-export interface GnosisBridgeSelectors {
+export interface OmniBridgeSelectors {
   selectBridgingDetails: ReturnType<typeof createSelectBridgingDetails>
 }
 
-export const gnosisSelectorsFactory = (gnosisBridges: GnosisList[]) => {
-  return gnosisBridges.reduce(
+export const omniBridgeSelectorsFactory = (omniBridges: OmniBridgeList[]) => {
+  return omniBridges.reduce(
     (total, bridgeId) => {
       const selectBridgingDetails = createSelectBridgingDetails(bridgeId)
 
@@ -36,9 +36,9 @@ export const gnosisSelectorsFactory = (gnosisBridges: GnosisList[]) => {
       return total
     },
     {} as {
-      [k in GnosisList]: GnosisBridgeSelectors
+      [k in OmniBridgeList]: OmniBridgeSelectors
     }
   )
 }
 
-export const gnosisSelectors = gnosisSelectorsFactory(['omnibridge:eth-xdai'])
+export const omniBridgeSelectors = omniBridgeSelectorsFactory(['omnibridge:eth-xdai'])
