@@ -17,3 +17,15 @@ export type TokenWithAddressAndChain = {
   chainId: ChainId
   address: string
 }
+
+type TokensSubgraph = {
+  address: string
+  chainId: ChainId
+  decimals: number
+  name: string
+  symbol: string
+}[]
+
+export type SubgraphResponse = {
+  tokens: TokensSubgraph
+}
