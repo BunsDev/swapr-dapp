@@ -10,11 +10,14 @@ import {
 } from '../EcoBridge.types'
 import { EcoBridgeChildBase } from '../EcoBridge.utils'
 import {
+  approveToken,
   calculateFees,
   checkRewardAddress,
   defaultTokensUrl,
+  fetchAllowance,
   fetchMode,
   fetchToAmount,
+  fetchTokenLimits,
   fetchToToken,
   getMediatorAddress
 } from './OmniBridge.utils'
@@ -22,13 +25,17 @@ import { omniBridgeActions } from './OmniBridge.reducers'
 import { foreignTokensQuery, homeTokensQuery } from './api/tokens'
 import { request } from 'graphql-request'
 import { BRIDGE_CONFIG } from './OmniBridge.config'
-import { SubgraphResponse } from './OmniBridge.types'
+import { PairTokens, SubgraphResponse } from './OmniBridge.types'
 import { schema, TokenInfo, TokenList } from '@uniswap/token-lists'
 import Ajv from 'ajv'
+import { ecoBridgeUIActions } from '../store/UI.reducer'
 
 export class OmniBridge extends EcoBridgeChildBase {
   private _homeChainId: ChainId
   private _foreignChainId: ChainId
+
+  private _tokensPair: PairTokens | undefined
+  private _currentDay: BigNumber | undefined
 
   private get store() {
     if (!this._store) throw new Error('Gnosis: No store set')
@@ -61,11 +68,137 @@ export class OmniBridge extends EcoBridgeChildBase {
 
   public triggerBridging = () => undefined
 
-  public approve = () => undefined
+  public approve = async () => {
+    if (!this._account || !this._activeProvider || !this._tokensPair) return
+
+    const { fromToken } = this._tokensPair
+
+    const { address, mediator, amount } = fromToken
+
+    if (!mediator) return
+
+    const tx = await approveToken({ address, mediator }, amount.toString(), this._activeProvider.getSigner())
+
+    this.store.dispatch(
+      ecoBridgeUIActions.setStatusButton({
+        label: 'Approving',
+        isError: false,
+        isLoading: true,
+        isBalanceSufficient: true,
+        approved: false
+      })
+    )
+
+    const receipt = await tx.wait()
+
+    if (receipt) {
+      this.store.dispatch(
+        ecoBridgeUIActions.setStatusButton({
+          label: 'Bridge',
+          isError: false,
+          isLoading: false,
+          isBalanceSufficient: true,
+          approved: true
+        })
+      )
+    }
+  }
 
   public collect = () => undefined
 
-  public validate = () => undefined
+  public validate = async () => {
+    if (!this._tokensPair || !this._staticProviders || !this._account || !this._currentDay) return
+
+    this.store.dispatch(
+      ecoBridgeUIActions.setStatusButton({
+        label: 'Loading',
+        isError: false,
+        isLoading: true,
+        isBalanceSufficient: false,
+        approved: false
+      })
+    )
+
+    const { fromToken, toToken } = this._tokensPair
+
+    const limits = await fetchTokenLimits(this.bridgeId, fromToken, toToken, this._currentDay, this._staticProviders)
+
+    if (!limits) return
+
+    const { maxPerTx, minPerTx } = limits
+
+    const { amount } = fromToken
+
+    const parsedMinPerTx = parseUnits(minPerTx.toString(), fromToken.decimals)
+    const parsedMaxPerTx = parseUnits(maxPerTx.toString(), fromToken.decimals)
+
+    if (amount.lt(parsedMinPerTx)) {
+      this.store.dispatch(
+        ecoBridgeUIActions.setStatusButton({
+          label: `Specify more than ${minPerTx.toString()}`,
+          isError: false,
+          isLoading: false,
+          isBalanceSufficient: false,
+          approved: false
+        })
+      )
+      return
+    }
+
+    if (amount.gt(parsedMaxPerTx)) {
+      this.store.dispatch(
+        ecoBridgeUIActions.setStatusButton({
+          label: `Specify less than ${maxPerTx.toString()}`,
+          isError: false,
+          isLoading: false,
+          isBalanceSufficient: false,
+          approved: false
+        })
+      )
+      return
+    }
+
+    const allowance = await fetchAllowance(
+      { address: fromToken.address, mediator: fromToken.mediator },
+      this._account,
+      this._staticProviders[fromToken.chainId]
+    )
+
+    if (!allowance || !fromToken.mode) {
+      this.store.dispatch(
+        ecoBridgeUIActions.setStatusButton({
+          label: 'Cannot fetch allowance. Try later',
+          isError: false,
+          isLoading: false,
+          isBalanceSufficient: false,
+          approved: false
+        })
+      )
+      return
+    }
+
+    if (['NATIVE', 'erc677'].includes(fromToken.mode) || allowance.gte(fromToken.amount)) {
+      this.store.dispatch(
+        ecoBridgeUIActions.setStatusButton({
+          label: 'Bridge',
+          isError: false,
+          isLoading: false,
+          isBalanceSufficient: true,
+          approved: true
+        })
+      )
+    } else {
+      this.store.dispatch(
+        ecoBridgeUIActions.setStatusButton({
+          label: 'Approve',
+          isError: false,
+          isLoading: false,
+          isBalanceSufficient: true,
+          approved: false
+        })
+      )
+    }
+  }
 
   public fetchDynamicLists = async () => {
     try {
@@ -73,9 +206,9 @@ export class OmniBridge extends EcoBridgeChildBase {
 
       const { from, to } = this.store.getState().ecoBridge.UI
 
-      const activeChains = [from.chainId, to.chainId]
+      const selectedChains = [from.chainId, to.chainId]
 
-      if (!(activeChains.includes(this._foreignChainId) && activeChains.includes(this._homeChainId))) {
+      if (!(selectedChains.includes(this._foreignChainId) && selectedChains.includes(this._homeChainId))) {
         this.store.dispatch(this.actions.setTokenListsStatus('ready'))
         return
       }
@@ -221,7 +354,9 @@ export class OmniBridge extends EcoBridgeChildBase {
       return
     }
 
-    const { feeManagerAddress, foreignToHomeFee, homeToForeignFee } = feesData
+    const { feeManagerAddress, foreignToHomeFee, homeToForeignFee, currentDay } = feesData
+
+    this._currentDay = currentDay
 
     const isAddressReward = await checkRewardAddress(
       feeManagerAddress,
@@ -236,13 +371,12 @@ export class OmniBridge extends EcoBridgeChildBase {
       : await fetchToAmount(
           this.bridgeId,
           feeType,
-          { address, chainId, name, mediator: fromTokenMediator, mode: fromTokenMode },
+          { address, chainId, name, mediator: fromTokenMediator },
           {
             address: toToken.address,
             chainId: toToken.chainId,
             name: toToken.name,
-            mediator: toToken.mediator ?? '',
-            mode: toToken.mode ?? ''
+            mediator: toToken.mediator ?? ''
           },
           parsedFromAmount,
           feeManagerAddress,
@@ -259,6 +393,26 @@ export class OmniBridge extends EcoBridgeChildBase {
           Number(formatUnits(parsedFromAmount.toString(), decimals))) *
         100
       ).toString()}%`
+    }
+
+    this._tokensPair = {
+      fromToken: {
+        address,
+        chainId,
+        name,
+        mode: fromTokenMode,
+        mediator: fromTokenMediator,
+        decimals: decimals ?? 0,
+        amount: parsedFromAmount
+      },
+      toToken: {
+        address: toToken.address,
+        chainId: toToken.chainId,
+        name: toToken.name,
+        decimals: toToken.decimals,
+        mode: toToken.mode,
+        mediator: toToken.mediator
+      }
     }
 
     const details = {

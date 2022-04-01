@@ -1,10 +1,11 @@
-import { BigNumber, Contract, ethers, utils } from 'ethers'
+import { BigNumber, Contract, ContractTransaction, ethers, Signer, utils } from 'ethers'
 import { Provider } from '@ethersproject/abstract-provider'
 import { ChainId } from '@swapr/sdk'
-import { TokenWithAddressAndChain } from './OmniBridge.types'
+import { TokenWithAddressAndChain, Token } from './OmniBridge.types'
 import { BRIDGE_CONFIG, OVERRIDES } from './OmniBridge.config'
 import { EcoBridgeProviders } from '../EcoBridge.types'
 
+//constants
 export const defaultTokensUrl: { [chainId: number]: string } = {
   100: 'https://tokens.honeyswap.org',
   1: 'https://tokens.uniswap.org'
@@ -103,7 +104,6 @@ export const fetchMode = async (
 }
 
 //get name
-
 export const fetchTokenName = async (token: TokenWithAddressAndChain & { name: string }, provider?: Provider) => {
   let tokenName = token.name || ''
 
@@ -317,8 +317,7 @@ export const fetchToToken = async (
   }
 }
 
-//calculate fee
-
+//calculate fee and toAmount
 const processMediatorData = async (
   direction: string,
   provider?: Provider
@@ -372,7 +371,7 @@ export const calculateFees = async (direction: string, provider?: Provider) => {
 
     if (!mediatorData) return
 
-    const { feeManagerAddress } = mediatorData
+    const { feeManagerAddress, currentDay } = mediatorData
 
     const feeManagerContract = new Contract(feeManagerAddress, abi, provider)
 
@@ -381,7 +380,7 @@ export const calculateFees = async (direction: string, provider?: Provider) => {
       feeManagerContract.HOME_TO_FOREIGN_FEE()
     ])
 
-    return { foreignToHomeFee, homeToForeignFee, feeManagerAddress }
+    return { foreignToHomeFee, homeToForeignFee, feeManagerAddress, currentDay }
   } catch (e) {
     return
   }
@@ -390,8 +389,8 @@ export const calculateFees = async (direction: string, provider?: Provider) => {
 export const fetchToAmount = async (
   direction: string,
   feeType: string,
-  fromToken: TokenWithAddressAndChain & { name: string; mode: string; mediator: string },
-  toToken: TokenWithAddressAndChain & { name: string; mode: string; mediator: string },
+  fromToken: TokenWithAddressAndChain & { name: string; mediator: string },
+  toToken: TokenWithAddressAndChain & { name: string; mediator: string },
   fromAmount: BigNumber,
   feeManagerAddress: string,
   provider?: Provider
@@ -417,5 +416,88 @@ export const fetchToAmount = async (
     return fromAmount.sub(fee)
   } catch (e) {
     return fromAmount
+  }
+}
+
+//allowance
+export const fetchAllowance = async (
+  { mediator, address }: { address: string; mediator?: string },
+  account: string,
+  provider?: Provider
+): Promise<BigNumber | undefined> => {
+  if (!account || !address || address === ADDRESS_ZERO || !mediator || mediator === ADDRESS_ZERO || !provider) return
+
+  try {
+    const abi = ['function allowance(address, address) view returns (uint256)']
+    const tokenContract = new Contract(address, abi, provider)
+    return tokenContract.allowance(account, mediator)
+  } catch (e) {
+    return
+  }
+}
+
+export const approveToken = async (
+  { address, mediator }: { address: string; mediator: string },
+  amount: string,
+  signer?: Signer
+): Promise<ContractTransaction> => {
+  const abi = ['function approve(address, uint256)']
+  const tokenContract = new Contract(address, abi, signer)
+  return tokenContract.approve(mediator, amount)
+}
+
+//tx limits
+export const fetchTokenLimits = async (
+  direction: string,
+  token: Token,
+  toToken: Token,
+  currentDay: BigNumber,
+  staticProviders: EcoBridgeProviders
+) => {
+  if (!token.mediator || !toToken.mediator) return
+
+  const fromProvider = staticProviders[token.chainId]
+  const toProvider = staticProviders[toToken.chainId]
+  const isDedicatedMediatorToken = token.mediator !== getMediatorAddressWithoutOverride(direction, token.chainId)
+
+  const abi = isDedicatedMediatorToken
+    ? [
+        'function minPerTx() view returns (uint256)',
+        'function executionMaxPerTx() view returns (uint256)',
+        'function executionDailyLimit() view returns (uint256)',
+        'function totalExecutedPerDay(uint256) view returns (uint256)'
+      ]
+    : [
+        'function minPerTx(address) view returns (uint256)',
+        'function executionMaxPerTx(address) view returns (uint256)',
+        'function executionDailyLimit(address) view returns (uint256)',
+        'function totalExecutedPerDay(address, uint256) view returns (uint256)'
+      ]
+
+  try {
+    const mediatorContract = new Contract(token.mediator, abi, fromProvider)
+    const toMediatorContract = new Contract(toToken.mediator, abi, toProvider)
+
+    const [minPerTx, executionMaxPerTx, executionDailyLimit, totalExecutedPerDay] = isDedicatedMediatorToken
+      ? await Promise.all<BigNumber, BigNumber, BigNumber, BigNumber>([
+          mediatorContract.minPerTx(),
+          toMediatorContract.executionMaxPerTx(),
+          mediatorContract.executionDailyLimit(),
+          toMediatorContract.totalExecutedPerDay(currentDay)
+        ])
+      : await Promise.all<BigNumber, BigNumber, BigNumber, BigNumber>([
+          mediatorContract.minPerTx(token.address),
+          toMediatorContract.executionMaxPerTx(toToken.address),
+          mediatorContract.executionDailyLimit(token.address),
+          toMediatorContract.totalExecutedPerDay(toToken.address, currentDay)
+        ])
+
+    return {
+      minPerTx,
+      maxPerTx: executionMaxPerTx,
+      dailyLimit: executionDailyLimit.sub(totalExecutedPerDay)
+    }
+  } catch (e) {
+    return
   }
 }

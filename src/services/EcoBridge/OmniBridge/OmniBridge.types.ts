@@ -1,6 +1,7 @@
 import { ChainId } from '@swapr/sdk'
 import { TransactionReceipt } from '@ethersproject/abstract-provider'
 import { BridgeTransactionSummary } from '../../../state/bridgeTransactions/types'
+import { BigNumber } from 'ethers'
 
 export interface BridgeTxsSummary extends BridgeTransactionSummary {
   message?: {
@@ -18,14 +19,23 @@ export type TokenWithAddressAndChain = {
   address: string
 }
 
-type TokensSubgraph = {
+export type TokenSubgraph = {
   address: string
   chainId: ChainId
   decimals: number
   name: string
   symbol: string
-}[]
+}
 
 export type SubgraphResponse = {
-  tokens: TokensSubgraph
+  tokens: TokenSubgraph[]
+}
+export type Token = Pick<TokenSubgraph, 'address' | 'chainId' | 'name' | 'decimals'> & {
+  mode?: string
+  mediator?: string
+}
+
+export type PairTokens = {
+  fromToken: Token & { amount: BigNumber }
+  toToken: Token
 }
