@@ -129,10 +129,7 @@ export class OmniBridge extends EcoBridgeChildBase {
 
     const { amount } = fromToken
 
-    const parsedMinPerTx = parseUnits(minPerTx.toString(), fromToken.decimals)
-    const parsedMaxPerTx = parseUnits(maxPerTx.toString(), fromToken.decimals)
-
-    if (amount.lt(parsedMinPerTx)) {
+    if (amount.lt(minPerTx)) {
       this.store.dispatch(
         ecoBridgeUIActions.setStatusButton({
           label: `Specify more than ${minPerTx.toString()}`,
@@ -145,7 +142,7 @@ export class OmniBridge extends EcoBridgeChildBase {
       return
     }
 
-    if (amount.gt(parsedMaxPerTx)) {
+    if (amount.gt(maxPerTx)) {
       this.store.dispatch(
         ecoBridgeUIActions.setStatusButton({
           label: `Specify less than ${maxPerTx.toString()}`,
@@ -424,5 +421,14 @@ export class OmniBridge extends EcoBridgeChildBase {
     this.store.dispatch(this.actions.setBridgeDetails(details))
   }
 
-  public triggerModalDisclaimerText = () => undefined
+  public triggerModalDisclaimerText = () => {
+    const fromName = this._activeChainId === this._homeChainId ? 'Gnosis' : 'Mainnet'
+    const toName = this._activeChainId !== this._foreignChainId ? 'Mainnet' : 'Gnosis'
+
+    this.store.dispatch(
+      ecoBridgeUIActions.setModalDisclaimerText(
+        `Please confirm that you would like to send your funds from ${fromName} to ${toName}. `
+      )
+    )
+  }
 }
