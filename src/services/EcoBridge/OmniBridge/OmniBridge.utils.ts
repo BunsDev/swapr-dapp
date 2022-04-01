@@ -11,6 +11,10 @@ export const defaultTokensUrl: { [chainId: number]: string } = {
   1: 'https://tokens.uniswap.org'
 }
 
+export const nativeCurrencyMediators: { [chainId: number]: string } = {
+  1: '0xa6439ca0fcba1d0f80df0be6a17220fed9c9038a'.toLowerCase()
+}
+
 const ADDRESS_ZERO = ethers.constants.AddressZero
 
 //overrides
@@ -499,5 +503,47 @@ export const fetchTokenLimits = async (
     }
   } catch (e) {
     return
+  }
+}
+
+//transfer tokens
+export const relayTokens = async (
+  signer: Signer,
+  token: { address: string; mode: string; mediator: string },
+  receiver: string,
+  amount: string,
+  { shouldReceiveNativeCur, foreignChainId }: { shouldReceiveNativeCur: boolean; foreignChainId: ChainId }
+): Promise<ContractTransaction> => {
+  const { mode, mediator, address } = token
+
+  const helperContractAddress = nativeCurrencyMediators[foreignChainId || 1]
+
+  switch (mode) {
+    case 'NATIVE': {
+      const abi = ['function wrapAndRelayTokens(address _receiver) public payable']
+      const helperContract = new Contract(helperContractAddress, abi, signer)
+      return helperContract.wrapAndRelayTokens(receiver, { value: amount })
+    }
+    case 'erc677': {
+      const abi = ['function transferAndCall(address, uint256, bytes)']
+      const tokenContract = new Contract(address, abi, signer)
+      const foreignHelperContract = nativeCurrencyMediators[foreignChainId || 1]
+      const bytesData =
+        shouldReceiveNativeCur && foreignHelperContract
+          ? `${foreignHelperContract}${receiver.replace('0x', '')}`
+          : receiver
+      return tokenContract.transferAndCall(mediator, amount, bytesData)
+    }
+    case 'dedicated-erc20': {
+      const abi = ['function relayTokens(address, uint256)']
+      const mediatorContract = new Contract(mediator, abi, signer)
+      return mediatorContract.relayTokens(receiver, amount)
+    }
+    case 'erc20':
+    default: {
+      const abi = ['function relayTokens(address, address, uint256)']
+      const mediatorContract = new Contract(mediator, abi, signer)
+      return mediatorContract.relayTokens(token.address, receiver, amount)
+    }
   }
 }

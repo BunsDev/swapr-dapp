@@ -3,6 +3,7 @@ import { ChainId, Currency } from '@swapr/sdk'
 import { BigNumber, ethers } from 'ethers'
 import { formatUnits } from 'ethers/lib/utils'
 import {
+  BridgeModalStatus,
   EcoBridgeChangeHandler,
   EcoBridgeChildBaseConstructor,
   EcoBridgeChildBaseInit,
@@ -19,7 +20,8 @@ import {
   fetchToAmount,
   fetchTokenLimits,
   fetchToToken,
-  getMediatorAddress
+  getMediatorAddress,
+  relayTokens
 } from './OmniBridge.utils'
 import { omniBridgeActions } from './OmniBridge.reducers'
 import { foreignTokensQuery, homeTokensQuery } from './api/tokens'
@@ -60,13 +62,48 @@ export class OmniBridge extends EcoBridgeChildBase {
   public init = async ({ account, activeChainId, activeProvider, staticProviders, store }: EcoBridgeChildBaseInit) => {
     this.setInitialEnv({ staticProviders, store })
     this.setSignerData({ account, activeChainId, activeProvider })
+
+    //TODO fetch history
+    //TODO pending listeners
   }
 
   public onSignerChange = async (signerData: EcoBridgeChangeHandler) => {
     this.setSignerData(signerData)
   }
 
-  public triggerBridging = () => undefined
+  public triggerBridging = async () => {
+    if (!this._account || !this._activeProvider || !this._tokensPair) return
+
+    const { fromToken, toToken } = this._tokensPair
+    const { address, mode, mediator, amount } = fromToken
+
+    if (!mode || !mediator || !toToken.mode) return
+
+    let shouldReceiveNativeCur = false
+    if (
+      toToken.chainId === BRIDGE_CONFIG[this.bridgeId].foreignChainId &&
+      toToken.address === ethers.constants.AddressZero &&
+      toToken.mode === 'NATIVE'
+    ) {
+      shouldReceiveNativeCur = true
+    }
+
+    this.store.dispatch(ecoBridgeUIActions.setBridgeModalStatus({ status: BridgeModalStatus.PENDING }))
+
+    const tx = await relayTokens(
+      this._activeProvider.getSigner(),
+      { address, mode, mediator },
+      this._account,
+      amount.toString(),
+      { shouldReceiveNativeCur, foreignChainId: this._foreignChainId }
+    )
+
+    this.store.dispatch(ecoBridgeUIActions.setBridgeModalStatus({ status: BridgeModalStatus.INITIATED }))
+
+    const receipt = await tx.wait()
+
+    //TODO history tx
+  }
 
   public approve = async () => {
     if (!this._account || !this._activeProvider || !this._tokensPair) return
@@ -104,7 +141,9 @@ export class OmniBridge extends EcoBridgeChildBase {
     }
   }
 
-  public collect = () => undefined
+  public collect = () => {
+    //TODO collect
+  }
 
   public validate = async () => {
     if (!this._tokensPair || !this._staticProviders || !this._account || !this._currentDay) return
