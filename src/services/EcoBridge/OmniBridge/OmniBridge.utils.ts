@@ -5,6 +5,7 @@ import { TokenWithAddressAndChain, Token, Request, Execution } from './OmniBridg
 import { BRIDGE_CONFIG, OVERRIDES } from './OmniBridge.config'
 import { EcoBridgeProviders } from '../EcoBridge.types'
 import { formatUnits } from 'ethers/lib/utils'
+import { BridgeTransactionStatus } from '../../../state/bridgeTransactions/types'
 
 //constants
 export const defaultTokensUrl: { [chainId: number]: string } = {
@@ -584,6 +585,32 @@ export const combineTransactions = (
       status: execution?.status
     }
   })
+
+export const getTransactionStatus = (
+  status: boolean | undefined | string,
+  isClaimed: boolean,
+  isFailed: boolean,
+  hasSignatures: boolean
+): BridgeTransactionStatus => {
+  if (status === 'pending') {
+    return 'pending'
+  }
+
+  if (!isClaimed) {
+    return 'redeem'
+  }
+
+  if (isClaimed) {
+    if (isFailed) {
+      return 'failed'
+    }
+    if (hasSignatures) {
+      return 'claimed'
+    }
+    return 'confirmed'
+  }
+  return 'loading'
+}
 
 //collect
 export const requiredSignatures = async (homeAmbAddress: string, homeProvider: Provider) => {

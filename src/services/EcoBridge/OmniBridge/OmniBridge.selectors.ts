@@ -1,8 +1,9 @@
 import { createSelector } from '@reduxjs/toolkit'
 import { AppState } from '../../../state'
-import { BridgeTransactionStatus, BridgeTransactionSummary } from '../../../state/bridgeTransactions/types'
+import { BridgeTransactionSummary } from '../../../state/bridgeTransactions/types'
 import { OmniBridgeList } from '../EcoBridge.types'
 import { OmniBridgeTxn } from './OmniBridge.types'
+import { getTransactionStatus } from './OmniBridge.utils'
 
 const createSelectBridgingDetails = (bridgeId: OmniBridgeList) =>
   createSelector(
@@ -43,32 +44,6 @@ const createSelectOwnedTxs = (bridgeId: OmniBridgeList) =>
       return ownedTxs
     }
   )
-
-const getTransactionStatus = (
-  status: boolean | undefined | string,
-  isClaimed: boolean,
-  isFailed: boolean,
-  hasSignatures: boolean
-): BridgeTransactionStatus => {
-  if (status === 'pending') {
-    return 'pending'
-  }
-
-  if (!isClaimed) {
-    return 'redeem'
-  }
-
-  if (isClaimed) {
-    if (isFailed) {
-      return 'failed'
-    }
-    if (hasSignatures) {
-      return 'claimed'
-    }
-    return 'confirmed'
-  }
-  return 'loading'
-}
 
 const createSelectBridgeTxsSummary = (
   bridgeId: OmniBridgeList,
