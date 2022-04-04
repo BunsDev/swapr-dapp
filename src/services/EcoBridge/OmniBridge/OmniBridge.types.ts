@@ -47,7 +47,7 @@ export type OmniBridgeTxn = {
   fromChainId: ChainId
   toChainId: ChainId
   sender: string
-  status: boolean | undefined
+  status: boolean | undefined | string
   timestampResolved?: number
   message?: {
     messageData: string | null

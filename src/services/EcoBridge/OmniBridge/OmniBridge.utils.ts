@@ -578,7 +578,7 @@ export const combineTransactions = (
       fromChainId: chainId,
       toChainId: bridgeChainId,
       sender: user,
-      timestampResolved: Number(timestamp),
+      timestampResolved: Number(timestamp) * 1000,
       message,
       partnerTxHash: execution?.txHash,
       status: execution?.status

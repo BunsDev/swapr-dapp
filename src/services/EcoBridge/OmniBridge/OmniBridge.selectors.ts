@@ -44,6 +44,32 @@ const createSelectOwnedTxs = (bridgeId: OmniBridgeList) =>
     }
   )
 
+const getTransactionStatus = (
+  status: boolean | undefined | string,
+  isClaimed: boolean,
+  isFailed: boolean,
+  hasSignatures: boolean
+): BridgeTransactionStatus => {
+  if (status === 'pending') {
+    return 'pending'
+  }
+
+  if (!isClaimed) {
+    return 'redeem'
+  }
+
+  if (isClaimed) {
+    if (isFailed) {
+      return 'failed'
+    }
+    if (hasSignatures) {
+      return 'claimed'
+    }
+    return 'confirmed'
+  }
+  return 'loading'
+}
+
 const createSelectBridgeTxsSummary = (
   bridgeId: OmniBridgeList,
   selectOwnedTxs: ReturnType<typeof createSelectOwnedTxs>
@@ -52,25 +78,11 @@ const createSelectBridgeTxsSummary = (
     const summaries = txs.map(tx => {
       const { txHash, value, timestampResolved, assetName, fromChainId, toChainId, partnerTxHash, status, message } = tx
 
-      const claimed = !!partnerTxHash
-      const failed = !!partnerTxHash && status === false
-      let transactionStatus: BridgeTransactionStatus = 'loading'
+      const isClaimed = !!partnerTxHash
+      const isFailed = !!partnerTxHash && status === false
+      const hasSignatures = message && message.signatures && message.messageData ? true : false
 
-      if (status === undefined) transactionStatus = 'loading'
-
-      if (claimed) {
-        if (failed) {
-          transactionStatus = 'failed'
-        }
-        transactionStatus = 'confirmed'
-
-        if (message && message?.signatures && message.messageData) {
-          transactionStatus = 'claimed'
-        }
-      }
-      if (!claimed) {
-        transactionStatus = 'redeem'
-      }
+      const transactionStatus = getTransactionStatus(status, isClaimed, isFailed, hasSignatures)
 
       const summary: BridgeTransactionSummary = {
         txHash,

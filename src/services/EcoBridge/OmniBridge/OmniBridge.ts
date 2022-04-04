@@ -129,7 +129,7 @@ export class OmniBridge extends EcoBridgeChildBase {
           txHash: tx.hash,
           value: formatUnits(amount.toString(), decimals),
           needsClaiming,
-          status: undefined
+          status: 'pending'
         })
       )
 
@@ -568,10 +568,10 @@ export class OmniBridge extends EcoBridgeChildBase {
       SubgraphRequestsData,
       SubgraphRequestsData
     >([
-      request('https://api.thegraph.com/subgraphs/name/dan13ram/sokol-omnibridge', requestsUserQuery, {
+      request(getGraphEndpoint(this._homeChainId, this.bridgeId), requestsUserQuery, {
         user: this._account
       }),
-      request('https://api.thegraph.com/subgraphs/name/dan13ram/kovan-omnibridge', requestsUserQuery, {
+      request(getGraphEndpoint(this._foreignChainId, this.bridgeId), requestsUserQuery, {
         user: this._account
       })
     ])
@@ -583,10 +583,10 @@ export class OmniBridge extends EcoBridgeChildBase {
       SubgraphExecutionsData,
       SubgraphExecutionsData
     >([
-      request('https://api.thegraph.com/subgraphs/name/dan13ram/sokol-omnibridge', executionsQuery, {
+      request(getGraphEndpoint(this._homeChainId, this.bridgeId), executionsQuery, {
         messageIds: foreignRequestsIds
       }),
-      request('https://api.thegraph.com/subgraphs/name/dan13ram/kovan-omnibridge', executionsQuery, {
+      request(getGraphEndpoint(this._foreignChainId, this.bridgeId), executionsQuery, {
         messageIds: homeRequestsIds
       })
     ])
