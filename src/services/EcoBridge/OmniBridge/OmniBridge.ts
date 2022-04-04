@@ -16,14 +16,19 @@ import {
   checkRewardAddress,
   combineTransactions,
   defaultTokensUrl,
+  executeSignatures,
   fetchAllowance,
+  fetchAmbVersion,
   fetchMode,
   fetchToAmount,
   fetchTokenLimits,
   fetchToToken,
   getGraphEndpoint,
   getMediatorAddress,
-  relayTokens
+  getMessage,
+  messageCallStatus,
+  relayTokens,
+  requiredSignatures
 } from './OmniBridge.utils'
 import { omniBridgeActions } from './OmniBridge.reducers'
 import { foreignTokensQuery, homeTokensQuery } from './api/tokens'
@@ -34,6 +39,7 @@ import { schema, TokenInfo, TokenList } from '@uniswap/token-lists'
 import Ajv from 'ajv'
 import { ecoBridgeUIActions } from '../store/UI.reducer'
 import { executionsQuery, requestsUserQuery } from './api/history'
+import { getErrorMsg } from '../Arbitrum/ArbitrumBridge.utils'
 
 export class OmniBridge extends EcoBridgeChildBase {
   private _homeChainId: ChainId
@@ -75,61 +81,67 @@ export class OmniBridge extends EcoBridgeChildBase {
   }
 
   public triggerBridging = async () => {
-    if (!this._account || !this._activeProvider || !this._tokensPair) return
+    try {
+      if (!this._account || !this._activeProvider || !this._tokensPair) return
 
-    const { fromToken, toToken } = this._tokensPair
-    const { address, mode, mediator, amount, chainId: fromChainId, decimals } = fromToken
+      const { fromToken, toToken } = this._tokensPair
+      const { address, mode, mediator, amount, chainId: fromChainId, decimals } = fromToken
 
-    const { chainId: toChainId } = toToken
+      const { chainId: toChainId } = toToken
 
-    if (!mode || !mediator || !toToken.mode) return
+      if (!mode || !mediator || !toToken.mode) return
 
-    let shouldReceiveNativeCur = false
-    if (
-      toToken.chainId === BRIDGE_CONFIG[this.bridgeId].foreignChainId &&
-      toToken.address === ethers.constants.AddressZero &&
-      toToken.mode === 'NATIVE'
-    ) {
-      shouldReceiveNativeCur = true
-    }
+      let shouldReceiveNativeCur = false
+      if (
+        toToken.chainId === BRIDGE_CONFIG[this.bridgeId].foreignChainId &&
+        toToken.address === ethers.constants.AddressZero &&
+        toToken.mode === 'NATIVE'
+      ) {
+        shouldReceiveNativeCur = true
+      }
 
-    const isHome = this._activeChainId === this._homeChainId
-    const claimDisabled = BRIDGE_CONFIG[this.bridgeId].claimDisabled
-    const tokensClaimDisabled = BRIDGE_CONFIG[this.bridgeId].tokensClaimDisabled
+      const isHome = this._activeChainId === this._homeChainId
+      const claimDisabled = BRIDGE_CONFIG[this.bridgeId].claimDisabled
+      const tokensClaimDisabled = BRIDGE_CONFIG[this.bridgeId].tokensClaimDisabled
 
-    //check is withdraw
-    const needsClaiming =
-      isHome && !claimDisabled && !(tokensClaimDisabled || []).includes(fromToken.address.toLowerCase())
+      //check is withdraw
+      const needsClaiming =
+        isHome && !claimDisabled && !(tokensClaimDisabled || []).includes(fromToken.address.toLowerCase())
 
-    this.store.dispatch(ecoBridgeUIActions.setBridgeModalStatus({ status: BridgeModalStatus.PENDING }))
+      this.store.dispatch(ecoBridgeUIActions.setBridgeModalStatus({ status: BridgeModalStatus.PENDING }))
 
-    const tx = await relayTokens(
-      this._activeProvider.getSigner(),
-      { address, mode, mediator },
-      this._account,
-      amount.toString(),
-      { shouldReceiveNativeCur, foreignChainId: this._foreignChainId }
-    )
+      const tx = await relayTokens(
+        this._activeProvider.getSigner(),
+        { address, mode, mediator },
+        this._account,
+        amount.toString(),
+        { shouldReceiveNativeCur, foreignChainId: this._foreignChainId }
+      )
 
-    this.store.dispatch(ecoBridgeUIActions.setBridgeModalStatus({ status: BridgeModalStatus.INITIATED }))
+      this.store.dispatch(ecoBridgeUIActions.setBridgeModalStatus({ status: BridgeModalStatus.INITIATED }))
 
-    this.store.dispatch(
-      this.actions.addTx({
-        assetName: fromToken.symbol ?? '',
-        fromChainId,
-        toChainId,
-        sender: this._account,
-        txHash: tx.hash,
-        value: formatUnits(amount.toString(), decimals),
-        needsClaiming,
-        status: undefined
-      })
-    )
+      this.store.dispatch(
+        this.actions.addTx({
+          assetName: fromToken.symbol ?? '',
+          fromChainId,
+          toChainId,
+          sender: this._account,
+          txHash: tx.hash,
+          value: formatUnits(amount.toString(), decimals),
+          needsClaiming,
+          status: undefined
+        })
+      )
 
-    const receipt = await tx.wait()
+      const receipt = await tx.wait()
 
-    if (receipt) {
-      this.store.dispatch(this.actions.updateTx({ txHash: receipt.transactionHash, receipt }))
+      if (receipt) {
+        this.store.dispatch(this.actions.updateTx({ txHash: receipt.transactionHash, receipt }))
+      }
+    } catch (e) {
+      this.store.dispatch(
+        ecoBridgeUIActions.setBridgeModalStatus({ status: BridgeModalStatus.ERROR, error: getErrorMsg(e) })
+      )
     }
   }
 
@@ -169,8 +181,67 @@ export class OmniBridge extends EcoBridgeChildBase {
     }
   }
 
-  public collect = () => {
-    //TODO collect
+  public collect = async () => {
+    try {
+      this.store.dispatch(ecoBridgeUIActions.setBridgeModalStatus({ status: BridgeModalStatus.PENDING }))
+
+      const collectableTxHash = this.store.getState().ecoBridge.UI.collectableTxHash
+      const transactions = this.store.getState().ecoBridge[this.bridgeId as OmniBridgeList].transactions
+
+      if (!collectableTxHash) return
+
+      const collectableTransaction = Object.values(transactions).find(tx => tx.txHash === collectableTxHash)
+
+      if (!this._staticProviders) return
+
+      const homeAmbAddress = BRIDGE_CONFIG[this.bridgeId].homeAmbAddress
+      const foreignAmbAddress = BRIDGE_CONFIG[this.bridgeId].foreignAmbAddress
+
+      const homeProvider = this._staticProviders[this._homeChainId]
+      const foreignProvider = this._staticProviders[this._foreignChainId]
+
+      if (!foreignProvider || !homeProvider || !collectableTransaction) return
+
+      const { message, txHash } = collectableTransaction
+      const homeRequiredSignatures = await requiredSignatures(homeAmbAddress, homeProvider)
+
+      let txMessage =
+        message && message.signatures && message.signatures.length >= homeRequiredSignatures ? message : null
+
+      if (!txMessage) {
+        const fetchedMessage = await getMessage(true, homeAmbAddress, txHash, homeProvider)
+        txMessage = fetchedMessage
+      }
+      const isClaimed = await messageCallStatus(foreignAmbAddress, txMessage.messageId, foreignProvider)
+
+      if (isClaimed || isClaimed !== undefined) return
+      const { signatures, messageData } = txMessage
+
+      if (!signatures || !messageData) return
+
+      const foreignAmbVersion = await fetchAmbVersion(foreignAmbAddress, foreignProvider)
+
+      const tx = await executeSignatures(
+        foreignAmbAddress,
+        foreignAmbVersion,
+        {
+          messageData,
+          signatures
+        },
+        foreignProvider.getSigner()
+      )
+      this.store.dispatch(ecoBridgeUIActions.setBridgeModalStatus({ status: BridgeModalStatus.COLLECTING }))
+
+      const receipt = tx.wait()
+
+      if (receipt) {
+        this.store.dispatch(ecoBridgeUIActions.setBridgeModalStatus({ status: BridgeModalStatus.SUCCESS }))
+      }
+    } catch (e) {
+      this.store.dispatch(
+        ecoBridgeUIActions.setBridgeModalStatus({ status: BridgeModalStatus.ERROR, error: getErrorMsg(e) })
+      )
+    }
   }
 
   public validate = async () => {

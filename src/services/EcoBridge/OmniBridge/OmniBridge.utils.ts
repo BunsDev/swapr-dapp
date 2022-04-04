@@ -1,5 +1,5 @@
 import { BigNumber, Contract, ContractTransaction, ethers, Signer, utils } from 'ethers'
-import { Provider } from '@ethersproject/abstract-provider'
+import { Provider, TransactionReceipt } from '@ethersproject/abstract-provider'
 import { ChainId } from '@swapr/sdk'
 import { TokenWithAddressAndChain, Token, Request, Execution } from './OmniBridge.types'
 import { BRIDGE_CONFIG, OVERRIDES } from './OmniBridge.config'
@@ -517,7 +517,7 @@ export const fetchTokenLimits = async (
   }
 }
 
-//transfer tokens
+//bridge transfer
 export const relayTokens = async (
   signer: Signer,
   token: { address: string; mode: string; mediator: string },
@@ -584,3 +584,163 @@ export const combineTransactions = (
       status: execution?.status
     }
   })
+
+//collect
+export const requiredSignatures = async (homeAmbAddress: string, homeProvider: Provider) => {
+  const abi = ['function requiredSignatures() public view returns (uint256)']
+  const ambContract = new Contract(homeAmbAddress, abi, homeProvider)
+  const numRequired = await ambContract.requiredSignatures()
+  const signatures = Number.parseInt(numRequired.toString(), 10)
+
+  return signatures
+}
+
+export const getMessageData = async (
+  isHome: boolean,
+  provider: Provider,
+  txHash: string,
+  txReceipt?: TransactionReceipt
+): Promise<{
+  messageId: string
+  messageData: string
+}> => {
+  const abi = isHome
+    ? new utils.Interface(['event UserRequestForSignature(bytes32 indexed messageId, bytes encodedData)'])
+    : new utils.Interface(['event UserRequestForAffirmation(bytes32 indexed messageId, bytes encodedData)'])
+  let receipt = txReceipt
+  if (!receipt) {
+    try {
+      receipt = await provider.getTransactionReceipt(txHash)
+    } catch (error) {
+      throw Error('Invalid hash.')
+    }
+  }
+  if (!receipt || !receipt.logs) {
+    throw Error('No transaction found.')
+  }
+  const eventFragment = abi.events[Object.keys(abi.events)[0]]
+  const eventTopic = abi.getEventTopic(eventFragment)
+  const event = receipt.logs.find(e => e.topics[0] === eventTopic)
+  if (!event) {
+    throw Error('It is not a bridge transaction. Specify hash of a transaction sending tokens to the bridge.')
+  }
+  const decodedLog = abi.decodeEventLog(eventFragment, event.data, event.topics)
+
+  return {
+    messageId: decodedLog.messageId,
+    messageData: decodedLog.encodedData
+  }
+}
+
+export const getMessage = async (
+  isHome: boolean,
+  ambAddress: string,
+  txHash: string,
+  provider: Provider
+): Promise<{
+  messageData: string
+  signatures: string[]
+  messageId: string
+}> => {
+  const { messageId, messageData } = await getMessageData(isHome, provider, txHash)
+  const messageHash = utils.solidityKeccak256(['bytes'], [messageData])
+
+  const abi = [
+    'function isAlreadyProcessed(uint256 _number) public pure returns (bool)',
+    'function requiredSignatures() public view returns (uint256)',
+    'function numMessagesSigned(bytes32 _message) public view returns (uint256)',
+    'function signature(bytes32 _hash, uint256 _index) public view returns (bytes)'
+  ]
+  const ambContract = new Contract(ambAddress, abi, provider)
+  const [requiredSignatures, numMessagesSigned] = await Promise.all([
+    ambContract.requiredSignatures(),
+    ambContract.numMessagesSigned(messageHash)
+  ])
+
+  const isEnoughCollected = await ambContract.isAlreadyProcessed(numMessagesSigned)
+  if (!isEnoughCollected) {
+    throw Error('Not enough collected signatures')
+  }
+  const signatures = await Promise.all(
+    Array(requiredSignatures.toNumber())
+      .fill(null)
+      .map((_item, index) => ambContract.signature(messageHash, index))
+  )
+  return {
+    messageData,
+    signatures,
+    messageId
+  }
+}
+
+export const messageCallStatus = async (
+  ambAddress: string,
+  messageId: string,
+  provider: Provider
+): Promise<boolean | undefined> => {
+  const abi = ['function messageCallStatus(bytes32 _messageId) public view returns (bool)']
+  const ambContract = new Contract(ambAddress, abi, provider)
+  const claimed = await ambContract.messageCallStatus(messageId)
+  return claimed
+}
+
+const packSignatures = (array: { r: string; s: string; v: string }[]) => {
+  const length = utils.hexValue(array.length).replace(/^0x/, '')
+  const msgLength = length.length === 1 ? `0${length}` : length
+
+  let v = ''
+  let r = ''
+  let s = ''
+
+  array.forEach(e => {
+    v = v.concat(e.v)
+    r = r.concat(e.r)
+    s = s.concat(e.s)
+  })
+
+  return `0x${msgLength}${v}${r}${s}`
+}
+
+const signatureToVRS = (rawSignature: string) => {
+  const signature = rawSignature.replace(/^0x/, '')
+  const v = signature.substr(64 * 2)
+  const r = signature.substr(0, 32 * 2)
+  const s = signature.substr(32 * 2, 32 * 2)
+  return { v, r, s }
+}
+
+export const executeSignatures = async (
+  address: string,
+  version: string,
+  { messageData, signatures }: { messageData: string; signatures: string[] },
+  signer: Signer
+) => {
+  const abi = [
+    'function executeSignatures(bytes messageData, bytes signatures) external',
+    'function safeExecuteSignaturesWithAutoGasLimit(bytes _data, bytes _signatures) external'
+  ]
+  const ambContract = new Contract(address, abi, signer)
+
+  let executeSignaturesFunc = ambContract.executeSignatures
+  if (version > '5.6.0') {
+    executeSignaturesFunc = ambContract.safeExecuteSignaturesWithAutoGasLimit
+  }
+
+  if (!signatures || signatures.length === 0) {
+    throw new Error('Not enough collected signatures')
+  }
+
+  const signs = packSignatures(signatures.map(s => signatureToVRS(s)))
+  const tx = await executeSignaturesFunc(messageData, signs)
+  return tx
+}
+export const fetchAmbVersion = async (address: string, provider: Provider) => {
+  if (!provider) {
+    return '0.0.0'
+  }
+  const abi = ['function getBridgeInterfacesVersion() external pure returns (uint64, uint64, uint64)']
+  const ambContract = new Contract(address, abi, provider)
+  const ambVersion: BigNumber[] = await ambContract.getBridgeInterfacesVersion()
+
+  return ambVersion.map(v => v.toNumber()).join('.')
+}
