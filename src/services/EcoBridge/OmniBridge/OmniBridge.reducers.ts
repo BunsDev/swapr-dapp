@@ -1,12 +1,11 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit'
-import { ChainId } from '@swapr/sdk'
+import { TransactionReceipt } from '@ethersproject/abstract-provider'
 import { AsyncState, BridgeDetails, BridgingDetailsErrorMessage, OmniBridgeList } from '../EcoBridge.types'
-import { BridgeTxsSummary } from './OmniBridge.types'
+import { OmniBridgeTxn } from './OmniBridge.types'
 import { TokenList } from '@uniswap/token-lists'
-import { TransactionReceipt } from '@ethersproject/providers'
 
 type InitialState = {
-  transactions: { [txHash: string]: BridgeTxsSummary }
+  transactions: { [txHash: string]: OmniBridgeTxn }
   lists: { [id: string]: TokenList }
   listsStatus: AsyncState
   bridgingDetails: BridgeDetails
@@ -29,7 +28,7 @@ export const createOmniBridgeSlice = (bridgeId: OmniBridgeList) =>
     name: bridgeId,
     initialState,
     reducers: {
-      addTransactions: (state, action: PayloadAction<BridgeTxsSummary[]>) => {
+      addTransactions: (state, action: PayloadAction<OmniBridgeTxn[]>) => {
         action.payload.forEach(txn => {
           if (!txn.txHash) return
 
@@ -42,7 +41,7 @@ export const createOmniBridgeSlice = (bridgeId: OmniBridgeList) =>
           }
         })
       },
-      addTx: (state, action: PayloadAction<BridgeTxsSummary>) => {
+      addTx: (state, action: PayloadAction<OmniBridgeTxn>) => {
         const { payload: txn } = action
 
         if (!txn.txHash) return
@@ -55,52 +54,21 @@ export const createOmniBridgeSlice = (bridgeId: OmniBridgeList) =>
           ...txn
         }
       },
-      updateTx: (state, action: PayloadAction<TransactionReceipt>) => {
-        if (action.payload.status === 1) {
-          state.transactions[action.payload.transactionHash].timestampResolved = Date.now()
-          state.transactions[action.payload.transactionHash].receipt = action.payload
-        }
-      },
-      updatePartnerTx: (
-        state,
-        action: PayloadAction<{
-          txHash: string
-          receivingTxHash: string
-          toChainId: ChainId
-          fromChainId: ChainId
-          transactionDetails: {
-            needsClaiming: boolean
-            type?: string
-          }
-          message?: {
-            messageData: string | null
-            signatures: string[] | null
-            messageId: string
-          }
-        }>
-      ) => {
-        const { payload: data } = action
+      updateTx: (state, action: PayloadAction<{ txHash: string; receipt: TransactionReceipt }>) => {
+        const { receipt, txHash } = action.payload
 
-        if (data.transactionDetails.needsClaiming && data.transactionDetails.type === 'withdraw') {
-          state.transactions[data.txHash].status = 'redeem'
-          state.transactions[data.txHash].message = data.message
+        if (!state.transactions[txHash]) {
+          throw Error('Transaction not found')
         }
 
-        if (!data.transactionDetails.needsClaiming) {
-          if (data.transactionDetails.type === 'deposit') {
-            state.transactions[action.payload.txHash].status = 'confirmed'
-          } else {
-            state.transactions[action.payload.txHash].status = 'claimed'
-          }
+        const txn = state.transactions[txHash]
 
-          state.transactions[action.payload.txHash].log.push({
-            txHash: action.payload.receivingTxHash,
-            chainId: action.payload.toChainId
-          })
-        }
-      },
-      updateStatusBeforeCollecting: (state, action: PayloadAction<{ txHash: string }>) => {
-        state.transactions[action.payload.txHash].status = 'pending'
+        if (txn.receipt) return
+
+        txn.receipt = receipt
+        txn.timestampResolved = Date.now()
+
+        state.transactions[txHash] = txn
       },
       setBridgeDetails: (state, action: PayloadAction<BridgeDetails>) => {
         const { gas, fee, estimateTime, receiveAmount, requestId } = action.payload

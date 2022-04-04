@@ -1,9 +1,10 @@
 import { BigNumber, Contract, ContractTransaction, ethers, Signer, utils } from 'ethers'
 import { Provider } from '@ethersproject/abstract-provider'
 import { ChainId } from '@swapr/sdk'
-import { TokenWithAddressAndChain, Token } from './OmniBridge.types'
+import { TokenWithAddressAndChain, Token, Request, Execution } from './OmniBridge.types'
 import { BRIDGE_CONFIG, OVERRIDES } from './OmniBridge.config'
 import { EcoBridgeProviders } from '../EcoBridge.types'
+import { formatUnits } from 'ethers/lib/utils'
 
 //constants
 export const defaultTokensUrl: { [chainId: number]: string } = {
@@ -16,6 +17,16 @@ export const nativeCurrencyMediators: { [chainId: number]: string } = {
 }
 
 const ADDRESS_ZERO = ethers.constants.AddressZero
+
+//subgraph
+export const getGraphEndpoint = (chainId: ChainId, direction: string) => {
+  const name =
+    chainId === BRIDGE_CONFIG[direction].homeChainId
+      ? BRIDGE_CONFIG[direction].homeGraphName
+      : BRIDGE_CONFIG[direction].foreignGraphName
+
+  return `https://api.thegraph.com/subgraphs/name/${name}`
+}
 
 //overrides
 const isOverridden = (bridgeDirection: string, token: TokenWithAddressAndChain) => {
@@ -547,3 +558,29 @@ export const relayTokens = async (
     }
   }
 }
+
+//txs history
+export const combineTransactions = (
+  requests: Request[],
+  executions: Execution[],
+  chainId: ChainId,
+  bridgeChainId: ChainId
+) =>
+  requests.map(request => {
+    const execution = executions.find(exec => exec.messageId === request.messageId)
+
+    const { amount, txHash, symbol, timestamp, user, message, decimals } = request
+
+    return {
+      txHash,
+      assetName: symbol,
+      value: formatUnits(amount, decimals),
+      fromChainId: chainId,
+      toChainId: bridgeChainId,
+      sender: user,
+      timestampResolved: Number(timestamp),
+      message,
+      partnerTxHash: execution?.txHash,
+      status: execution?.status
+    }
+  })

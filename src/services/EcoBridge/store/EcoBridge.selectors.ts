@@ -63,10 +63,11 @@ export const selectBridgeTransactions = createSelector(
   [
     arbitrumSelectors['arbitrum:testnet'].selectBridgeTxsSummary,
     arbitrumSelectors['arbitrum:mainnet'].selectBridgeTxsSummary,
-    socketSelectors['socket'].selectBridgeTxsSummary
+    socketSelectors['socket'].selectBridgeTxsSummary,
+    omniBridgeSelectors['omnibridge:eth-xdai'].selectBridgeTxsSummary
   ],
-  (txsSummaryTestnet, txsSummaryMainnet, txsSummarySocket) => {
-    const txs = [...txsSummaryTestnet, ...txsSummaryMainnet, ...txsSummarySocket]
+  (txsSummaryTestnet, txsSummaryMainnet, txsSummarySocket, txsOmnibridgeEthGnosis) => {
+    const txs = [...txsSummaryTestnet, ...txsSummaryMainnet, ...txsSummarySocket, ...txsOmnibridgeEthGnosis]
 
     return txs
   }

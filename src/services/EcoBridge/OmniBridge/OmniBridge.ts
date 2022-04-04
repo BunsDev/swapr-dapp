@@ -14,12 +14,14 @@ import {
   approveToken,
   calculateFees,
   checkRewardAddress,
+  combineTransactions,
   defaultTokensUrl,
   fetchAllowance,
   fetchMode,
   fetchToAmount,
   fetchTokenLimits,
   fetchToToken,
+  getGraphEndpoint,
   getMediatorAddress,
   relayTokens
 } from './OmniBridge.utils'
@@ -27,10 +29,11 @@ import { omniBridgeActions } from './OmniBridge.reducers'
 import { foreignTokensQuery, homeTokensQuery } from './api/tokens'
 import { request } from 'graphql-request'
 import { BRIDGE_CONFIG } from './OmniBridge.config'
-import { PairTokens, SubgraphResponse } from './OmniBridge.types'
+import { PairTokens, SubgraphExecutionsData, SubgraphRequestsData, SubgraphResponse } from './OmniBridge.types'
 import { schema, TokenInfo, TokenList } from '@uniswap/token-lists'
 import Ajv from 'ajv'
 import { ecoBridgeUIActions } from '../store/UI.reducer'
+import { executionsQuery, requestsUserQuery } from './api/history'
 
 export class OmniBridge extends EcoBridgeChildBase {
   private _homeChainId: ChainId
@@ -63,7 +66,7 @@ export class OmniBridge extends EcoBridgeChildBase {
     this.setInitialEnv({ staticProviders, store })
     this.setSignerData({ account, activeChainId, activeProvider })
 
-    //TODO fetch history
+    await this._fetchHistory()
     //TODO pending listeners
   }
 
@@ -75,7 +78,9 @@ export class OmniBridge extends EcoBridgeChildBase {
     if (!this._account || !this._activeProvider || !this._tokensPair) return
 
     const { fromToken, toToken } = this._tokensPair
-    const { address, mode, mediator, amount } = fromToken
+    const { address, mode, mediator, amount, chainId: fromChainId, decimals } = fromToken
+
+    const { chainId: toChainId } = toToken
 
     if (!mode || !mediator || !toToken.mode) return
 
@@ -87,6 +92,14 @@ export class OmniBridge extends EcoBridgeChildBase {
     ) {
       shouldReceiveNativeCur = true
     }
+
+    const isHome = this._activeChainId === this._homeChainId
+    const claimDisabled = BRIDGE_CONFIG[this.bridgeId].claimDisabled
+    const tokensClaimDisabled = BRIDGE_CONFIG[this.bridgeId].tokensClaimDisabled
+
+    //check is withdraw
+    const needsClaiming =
+      isHome && !claimDisabled && !(tokensClaimDisabled || []).includes(fromToken.address.toLowerCase())
 
     this.store.dispatch(ecoBridgeUIActions.setBridgeModalStatus({ status: BridgeModalStatus.PENDING }))
 
@@ -100,9 +113,24 @@ export class OmniBridge extends EcoBridgeChildBase {
 
     this.store.dispatch(ecoBridgeUIActions.setBridgeModalStatus({ status: BridgeModalStatus.INITIATED }))
 
+    this.store.dispatch(
+      this.actions.addTx({
+        assetName: fromToken.symbol ?? '',
+        fromChainId,
+        toChainId,
+        sender: this._account,
+        txHash: tx.hash,
+        value: formatUnits(amount.toString(), decimals),
+        needsClaiming,
+        status: undefined
+      })
+    )
+
     const receipt = await tx.wait()
 
-    //TODO history tx
+    if (receipt) {
+      this.store.dispatch(this.actions.updateTx({ txHash: receipt.transactionHash, receipt }))
+    }
   }
 
   public approve = async () => {
@@ -251,19 +279,8 @@ export class OmniBridge extends EcoBridgeChildBase {
 
       this.store.dispatch(this.actions.setTokenListsStatus('loading'))
 
-      const getGraphEndpoint = (chainId: ChainId) => {
-        const name =
-          chainId === this._homeChainId
-            ? BRIDGE_CONFIG[this.bridgeId].homeGraphName
-            : BRIDGE_CONFIG[this.bridgeId].foreignGraphName
-
-        return `https://api.thegraph.com/subgraphs/name/${name}`
-      }
-
-      const homeEndpoint = getGraphEndpoint(from.chainId)
-      const foreignEndpoint = getGraphEndpoint(
-        from.chainId === this._homeChainId ? this._foreignChainId : this._homeChainId
-      )
+      const homeEndpoint = getGraphEndpoint(from.chainId, this.bridgeId)
+      const foreignEndpoint = getGraphEndpoint(to.chainId, this.bridgeId)
 
       const fetchDefaultTokens = async () => {
         const url = defaultTokensUrl[Number(from.chainId)]
@@ -328,7 +345,7 @@ export class OmniBridge extends EcoBridgeChildBase {
       this.store.dispatch(this.actions.setBridgeDetailsStatus({ status: 'failed' }))
       return
     }
-    const { address, chainId, name, value, decimals } = this.store.getState().ecoBridge.UI.from
+    const { address, chainId, name, value, decimals, symbol } = this.store.getState().ecoBridge.UI.from
 
     if (Number(value) === 0) {
       this.store.dispatch(this.actions.setBridgeDetailsStatus({ status: 'idle' }))
@@ -439,7 +456,8 @@ export class OmniBridge extends EcoBridgeChildBase {
         mode: fromTokenMode,
         mediator: fromTokenMediator,
         decimals: decimals ?? 0,
-        amount: parsedFromAmount
+        amount: parsedFromAmount,
+        symbol
       },
       toToken: {
         address: toToken.address,
@@ -469,5 +487,48 @@ export class OmniBridge extends EcoBridgeChildBase {
         `Please confirm that you would like to send your funds from ${fromName} to ${toName}. `
       )
     )
+  }
+
+  private _fetchHistory = async () => {
+    if (!this._account || !this._activeChainId) return
+
+    //currently fetching data from testnet it will be removed
+    const [{ requests: homeRequests }, { requests: foreignRequests }] = await Promise.all<
+      SubgraphRequestsData,
+      SubgraphRequestsData
+    >([
+      request('https://api.thegraph.com/subgraphs/name/dan13ram/sokol-omnibridge', requestsUserQuery, {
+        user: this._account
+      }),
+      request('https://api.thegraph.com/subgraphs/name/dan13ram/kovan-omnibridge', requestsUserQuery, {
+        user: this._account
+      })
+    ])
+
+    const homeRequestsIds = homeRequests.map(request => request.messageId)
+    const foreignRequestsIds = foreignRequests.map(request => request.messageId)
+
+    const [{ executions: homeExecutions }, { executions: foreignExecutions }] = await Promise.all<
+      SubgraphExecutionsData,
+      SubgraphExecutionsData
+    >([
+      request('https://api.thegraph.com/subgraphs/name/dan13ram/sokol-omnibridge', executionsQuery, {
+        messageIds: foreignRequestsIds
+      }),
+      request('https://api.thegraph.com/subgraphs/name/dan13ram/kovan-omnibridge', executionsQuery, {
+        messageIds: homeRequestsIds
+      })
+    ])
+
+    const homeTransfers = combineTransactions(homeRequests, foreignExecutions, this._homeChainId, this._foreignChainId)
+
+    const foreignTransfers = combineTransactions(
+      foreignRequests,
+      homeExecutions,
+      this._foreignChainId,
+      this._homeChainId
+    )
+
+    this.store.dispatch(this.actions.addTransactions([...homeTransfers, ...foreignTransfers]))
   }
 }
