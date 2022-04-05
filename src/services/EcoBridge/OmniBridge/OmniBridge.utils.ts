@@ -771,3 +771,28 @@ export const fetchAmbVersion = async (address: string, provider: Provider) => {
 
   return ambVersion.map(v => v.toNumber()).join('.')
 }
+
+export const timeout = (ms: number, promise: Promise<any>): Promise<TransactionReceipt> =>
+  new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error('timeout - tx receipt'))
+    }, ms)
+
+    promise
+      .then(value => {
+        clearTimeout(timer)
+        resolve(value)
+      })
+      .catch(error => {
+        clearTimeout(timer)
+        reject(error)
+      })
+  })
+
+export const fetchConfirmations = async (address: string, provider: Provider) => {
+  const abi = ['function requiredBlockConfirmations() view returns (uint256)']
+  const ambContract = new Contract(address, abi, provider)
+  const requiredConfirmations = await ambContract.requiredBlockConfirmations()
+
+  return parseInt(requiredConfirmations, 10)
+}

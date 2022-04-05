@@ -82,10 +82,16 @@ const createSelectBridgeTxsSummary = (
     return summaries
   })
 
+const createSelectPendingTransactions = (selectOwnedTxs: ReturnType<typeof createSelectOwnedTxs>) =>
+  createSelector([selectOwnedTxs], txs => {
+    return txs.filter(tx => tx.status === 'pending')
+  })
+
 export interface OmniBridgeSelectors {
   selectBridgingDetails: ReturnType<typeof createSelectBridgingDetails>
   selectOwnedTxs: ReturnType<typeof createSelectOwnedTxs>
   selectBridgeTxsSummary: ReturnType<typeof createSelectBridgeTxsSummary>
+  selectPendingTxs: ReturnType<typeof createSelectPendingTransactions>
 }
 
 export const omniBridgeSelectorsFactory = (omniBridges: OmniBridgeList[]) => {
@@ -94,11 +100,13 @@ export const omniBridgeSelectorsFactory = (omniBridges: OmniBridgeList[]) => {
       const selectBridgingDetails = createSelectBridgingDetails(bridgeId)
       const selectOwnedTxs = createSelectOwnedTxs(bridgeId)
       const selectBridgeTxsSummary = createSelectBridgeTxsSummary(bridgeId, selectOwnedTxs)
+      const selectPendingTxs = createSelectPendingTransactions(selectOwnedTxs)
 
       const selectors = {
         selectBridgingDetails,
         selectOwnedTxs,
-        selectBridgeTxsSummary
+        selectBridgeTxsSummary,
+        selectPendingTxs
       }
 
       total[bridgeId] = selectors

@@ -19,6 +19,7 @@ import {
   executeSignatures,
   fetchAllowance,
   fetchAmbVersion,
+  fetchConfirmations,
   fetchMode,
   fetchToAmount,
   fetchTokenLimits,
@@ -28,7 +29,8 @@ import {
   getMessage,
   messageCallStatus,
   relayTokens,
-  requiredSignatures
+  requiredSignatures,
+  timeout
 } from './OmniBridge.utils'
 import { omniBridgeActions } from './OmniBridge.reducers'
 import { foreignTokensQuery, homeTokensQuery } from './api/tokens'
@@ -40,11 +42,12 @@ import Ajv from 'ajv'
 import { ecoBridgeUIActions } from '../store/UI.reducer'
 import { executionsQuery, requestsUserQuery } from './api/history'
 import { getErrorMsg } from '../Arbitrum/ArbitrumBridge.utils'
+import { omniBridgeSelectors } from './OmniBridge.selectors'
 
 export class OmniBridge extends EcoBridgeChildBase {
   private _homeChainId: ChainId
   private _foreignChainId: ChainId
-
+  private _listeners: NodeJS.Timeout[] = []
   private _tokensPair: PairTokens | undefined
   private _currentDay: BigNumber | undefined
 
@@ -55,6 +58,9 @@ export class OmniBridge extends EcoBridgeChildBase {
 
   private get actions() {
     return omniBridgeActions[this.bridgeId as OmniBridgeList]
+  }
+  private get selectors() {
+    return omniBridgeSelectors[this.bridgeId as OmniBridgeList]
   }
 
   constructor({ supportedChains: supportedChainsArr, bridgeId, displayName }: EcoBridgeChildBaseConstructor) {
@@ -74,6 +80,11 @@ export class OmniBridge extends EcoBridgeChildBase {
 
     await this._fetchHistory()
     //TODO pending listeners
+    this.startListeners()
+  }
+
+  private startListeners = () => {
+    this._listeners.push(setInterval(this.pendingTxListener, 5000))
   }
 
   public onSignerChange = async (signerData: EcoBridgeChangeHandler) => {
@@ -563,7 +574,6 @@ export class OmniBridge extends EcoBridgeChildBase {
   private _fetchHistory = async () => {
     if (!this._account || !this._activeChainId) return
 
-    //currently fetching data from testnet it will be removed
     const [{ requests: homeRequests }, { requests: foreignRequests }] = await Promise.all<
       SubgraphRequestsData,
       SubgraphRequestsData
@@ -601,5 +611,31 @@ export class OmniBridge extends EcoBridgeChildBase {
     )
 
     this.store.dispatch(this.actions.addTransactions([...homeTransfers, ...foreignTransfers]))
+  }
+
+  private pendingTxListener = async () => {
+    try {
+      if (!this._account || !this._staticProviders) return
+      const pendingTxs = this.selectors.selectPendingTxs(this.store.getState(), this._account)
+      pendingTxs.map(async pendingTx => {
+        if (!this._staticProviders) return
+        const { fromChainId, txHash } = pendingTx
+        const tx = await this._staticProviders[fromChainId]?.getTransaction(txHash)
+        const receipt = tx ? await timeout(25000, tx.wait()) : null
+        const ambAddress =
+          fromChainId === this._homeChainId
+            ? BRIDGE_CONFIG[this.bridgeId].homeAmbAddress
+            : BRIDGE_CONFIG[this.bridgeId].foreignAmbAddress
+        const provider =
+          fromChainId === this._homeChainId
+            ? this._staticProviders[this._homeChainId]
+            : this._staticProviders[this._foreignChainId]
+        if (!provider) return
+        const confirmations = receipt ? receipt.confirmations : 0
+        const totalConfirms = await fetchConfirmations(ambAddress, provider)
+      })
+    } catch (e) {
+      return
+    }
   }
 }
