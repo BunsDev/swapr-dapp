@@ -59,6 +59,8 @@ const createSelectBridgeTxsSummary = (
 
       const transactionStatus = getTransactionStatus(status, isClaimed, isFailed, hasSignatures)
 
+      const pendingReason = status === 'pending' ? 'Transaction has not been confirmed yet' : ''
+
       const summary: BridgeTransactionSummary = {
         txHash,
         assetName,
@@ -67,7 +69,8 @@ const createSelectBridgeTxsSummary = (
         toChainId,
         log: [{ chainId: fromChainId, txHash: txHash }],
         bridgeId,
-        status: transactionStatus
+        status: transactionStatus,
+        pendingReason
       }
 
       if (partnerTxHash) {
