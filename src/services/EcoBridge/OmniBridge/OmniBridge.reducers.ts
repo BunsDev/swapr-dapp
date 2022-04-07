@@ -1,7 +1,7 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit'
 import { TransactionReceipt } from '@ethersproject/abstract-provider'
 import { AsyncState, BridgeDetails, BridgingDetailsErrorMessage, OmniBridgeList } from '../EcoBridge.types'
-import { OmniBridgeTxn } from './OmniBridge.types'
+import { OmniBridgeTxn, TransactionMessage } from './OmniBridge.types'
 import { TokenList } from '@uniswap/token-lists'
 
 type InitialState = {
@@ -121,6 +121,29 @@ export const createOmniBridgeSlice = (bridgeId: OmniBridgeList) =>
         const { payload } = action
 
         state.lists = payload
+      },
+      updatePartnerTransaction: (
+        state,
+        action: PayloadAction<{
+          txHash?: string
+          partnerTxHash?: string
+          message?: TransactionMessage
+          status?: string | boolean
+        }>
+      ) => {
+        const { txHash, partnerTxHash, message, status } = action.payload
+        if (!txHash) return
+
+        if (partnerTxHash) {
+          state.transactions[txHash].partnerTxHash = partnerTxHash
+        }
+
+        if (message) {
+          state.transactions[txHash].message = message
+        }
+        if (status !== undefined) {
+          state.transactions[txHash].status = status
+        }
       }
     }
   })
