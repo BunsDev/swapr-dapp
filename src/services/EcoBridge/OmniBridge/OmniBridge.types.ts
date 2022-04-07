@@ -1,18 +1,6 @@
 import { ChainId } from '@swapr/sdk'
 import { TransactionReceipt } from '@ethersproject/abstract-provider'
-import { BridgeTransactionSummary } from '../../../state/bridgeTransactions/types'
 import { BigNumber } from 'ethers'
-
-export interface BridgeTxsSummary extends BridgeTransactionSummary {
-  message?: {
-    messageData: string | null
-    messageId: string
-    signatures: string[] | null
-    txHash?: string
-  }
-  needsClaiming?: boolean
-  receipt?: TransactionReceipt
-}
 
 export type TokenWithAddressAndChain = {
   chainId: ChainId
@@ -40,6 +28,13 @@ export type PairTokens = {
   toToken: Token
 }
 
+export type TransactionMessage = {
+  messageData: string | null
+  messageId: string
+  signatures: string[] | null
+  txHash?: string
+}
+
 export type OmniBridgeTxn = {
   txHash: string
   assetName: string
@@ -49,12 +44,7 @@ export type OmniBridgeTxn = {
   sender: string
   status: boolean | undefined | string
   timestampResolved?: number
-  message?: {
-    messageData: string | null
-    messageId: string
-    signatures: string[] | null
-    txHash?: string
-  }
+  message?: TransactionMessage
   receipt?: TransactionReceipt
   needsClaiming?: boolean
   partnerTxHash?: string
