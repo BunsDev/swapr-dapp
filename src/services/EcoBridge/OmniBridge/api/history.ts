@@ -31,3 +31,10 @@ export const executionsQuery = gql`
     }
   }
 `
+export const partnerTxHashQuery = gql`
+  query getReceivingTxHash($messageId: String!) {
+    executions(where: { messageId: $messageId }) {
+      txHash
+    }
+  }
+`
