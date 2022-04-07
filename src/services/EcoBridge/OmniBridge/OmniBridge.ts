@@ -27,6 +27,7 @@ import {
   getGraphEndpoint,
   getMediatorAddress,
   getMessage,
+  getMessageData,
   messageCallStatus,
   relayTokens,
   requiredSignatures,
@@ -40,7 +41,7 @@ import { PairTokens, SubgraphExecutionsData, SubgraphRequestsData, SubgraphRespo
 import { schema, TokenInfo, TokenList } from '@uniswap/token-lists'
 import Ajv from 'ajv'
 import { ecoBridgeUIActions } from '../store/UI.reducer'
-import { executionsQuery, requestsUserQuery } from './api/history'
+import { executionsQuery, partnerTxHashQuery, requestsUserQuery } from './api/history'
 import { getErrorMsg } from '../Arbitrum/ArbitrumBridge.utils'
 import { omniBridgeSelectors } from './OmniBridge.selectors'
 
@@ -214,8 +215,8 @@ export class OmniBridge extends EcoBridgeChildBase {
       if (!foreignProvider || !homeProvider || !collectableTransaction) return
 
       const { message, txHash } = collectableTransaction
-      const homeRequiredSignatures = await requiredSignatures(homeAmbAddress, homeProvider)
 
+      const homeRequiredSignatures = await requiredSignatures(homeAmbAddress, homeProvider)
       let txMessage =
         message && message.signatures && message.signatures.length >= homeRequiredSignatures ? message : null
 
@@ -225,10 +226,19 @@ export class OmniBridge extends EcoBridgeChildBase {
       }
       const isClaimed = await messageCallStatus(foreignAmbAddress, txMessage.messageId, foreignProvider)
 
-      if (isClaimed || isClaimed !== undefined) return
+      if (isClaimed) {
+        this.store.dispatch(
+          ecoBridgeUIActions.setBridgeModalStatus({
+            status: BridgeModalStatus.ERROR,
+            error: 'Transaction already claimed'
+          })
+        )
+        return
+      }
+
       const { signatures, messageData } = txMessage
 
-      if (!signatures || !messageData) return
+      if (!signatures || !messageData || !this._activeProvider) return
 
       const foreignAmbVersion = await fetchAmbVersion(foreignAmbAddress, foreignProvider)
 
@@ -239,13 +249,19 @@ export class OmniBridge extends EcoBridgeChildBase {
           messageData,
           signatures
         },
-        foreignProvider.getSigner()
+        this._activeProvider.getSigner()
       )
+
+      this.store.dispatch(this.actions.updatePartnerTransaction({ txHash, status: 'pending' }))
+
       this.store.dispatch(ecoBridgeUIActions.setBridgeModalStatus({ status: BridgeModalStatus.COLLECTING }))
 
-      const receipt = tx.wait()
+      const receipt = await tx.wait()
 
       if (receipt) {
+        this.store.dispatch(
+          this.actions.updatePartnerTransaction({ txHash, partnerTxHash: receipt.transactionHash, status: true })
+        )
         this.store.dispatch(ecoBridgeUIActions.setBridgeModalStatus({ status: BridgeModalStatus.SUCCESS }))
       }
     } catch (e) {
@@ -413,7 +429,7 @@ export class OmniBridge extends EcoBridgeChildBase {
         tokens
       }
 
-      this.store.dispatch(this.actions.addTokenLists({ 'omnibridge:eth-xdai': tokenList }))
+      this.store.dispatch(this.actions.addTokenLists({ [this.bridgeId]: tokenList }))
       this.store.dispatch(this.actions.setTokenListsStatus('ready'))
     } catch (e) {
       this.store.dispatch(this.actions.setTokenListsStatus('failed'))
@@ -617,22 +633,79 @@ export class OmniBridge extends EcoBridgeChildBase {
     try {
       if (!this._account || !this._staticProviders) return
       const pendingTxs = this.selectors.selectPendingTxs(this.store.getState(), this._account)
+
+      if (!pendingTxs.length) return
+
       pendingTxs.map(async pendingTx => {
         if (!this._staticProviders) return
-        const { fromChainId, txHash } = pendingTx
+
+        const { fromChainId, txHash, needsClaiming, toChainId } = pendingTx
+
         const tx = await this._staticProviders[fromChainId]?.getTransaction(txHash)
+
         const receipt = tx ? await timeout(25000, tx.wait()) : null
+
         const ambAddress =
           fromChainId === this._homeChainId
             ? BRIDGE_CONFIG[this.bridgeId].homeAmbAddress
             : BRIDGE_CONFIG[this.bridgeId].foreignAmbAddress
+
         const provider =
           fromChainId === this._homeChainId
             ? this._staticProviders[this._homeChainId]
             : this._staticProviders[this._foreignChainId]
+
         if (!provider) return
         const confirmations = receipt ? receipt.confirmations : 0
         const totalConfirms = await fetchConfirmations(ambAddress, provider)
+
+        const isHome = fromChainId === this._homeChainId
+
+        if (receipt) {
+          if (confirmations >= totalConfirms) {
+            if (needsClaiming) {
+              try {
+                const message = await getMessage(isHome, ambAddress, txHash, provider)
+
+                if (message && message.signatures) {
+                  this.store.dispatch(this.actions.updatePartnerTransaction({ txHash, message, status: true }))
+                }
+              } catch (e) {
+                return
+              }
+            } else {
+              const toProvider = this._staticProviders[toChainId]
+              const toAmbAddress = BRIDGE_CONFIG[this.bridgeId].homeAmbAddress
+              if (!toProvider) return
+              const { messageId } = await getMessageData(isHome, provider, txHash, receipt)
+
+              const status = await messageCallStatus(toAmbAddress, messageId, toProvider)
+
+              if (status) {
+                const data = await request<{ executions: { txHash: string }[] }>(
+                  getGraphEndpoint(toChainId, this.bridgeId),
+                  partnerTxHashQuery,
+                  {
+                    messageId
+                  }
+                )
+
+                if (data && data.executions.length) {
+                  const [partnerTransaction] = data.executions
+                  if (!partnerTransaction) return
+
+                  this.store.dispatch(
+                    this.actions.updatePartnerTransaction({
+                      txHash,
+                      partnerTxHash: partnerTransaction.txHash,
+                      status: true
+                    })
+                  )
+                }
+              }
+            }
+          }
+        }
       })
     } catch (e) {
       return
