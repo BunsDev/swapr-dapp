@@ -704,10 +704,10 @@ export const messageCallStatus = async (
   ambAddress: string,
   messageId: string,
   provider: Provider
-): Promise<boolean | undefined> => {
+): Promise<boolean> => {
   const abi = ['function messageCallStatus(bytes32 _messageId) public view returns (bool)']
   const ambContract = new Contract(ambAddress, abi, provider)
-  const claimed = await ambContract.messageCallStatus(messageId)
+  const claimed: boolean = await ambContract.messageCallStatus(messageId)
   return claimed
 }
 
@@ -741,7 +741,7 @@ export const executeSignatures = async (
   version: string,
   { messageData, signatures }: { messageData: string; signatures: string[] },
   signer: Signer
-) => {
+): Promise<ContractTransaction> => {
   const abi = [
     'function executeSignatures(bytes messageData, bytes signatures) external',
     'function safeExecuteSignaturesWithAutoGasLimit(bytes _data, bytes _signatures) external'
@@ -758,6 +758,7 @@ export const executeSignatures = async (
   }
 
   const signs = packSignatures(signatures.map(s => signatureToVRS(s)))
+
   const tx = await executeSignaturesFunc(messageData, signs)
   return tx
 }
