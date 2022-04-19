@@ -1,4 +1,4 @@
-import { parseUnits } from '@ethersproject/units'
+import { formatEther, parseUnits } from '@ethersproject/units'
 import { ChainId, Currency } from '@swapr/sdk'
 import { BigNumber, ethers } from 'ethers'
 import { formatUnits } from 'ethers/lib/utils'
@@ -42,8 +42,9 @@ import { schema, TokenInfo, TokenList } from '@uniswap/token-lists'
 import Ajv from 'ajv'
 import { ecoBridgeUIActions } from '../store/UI.reducer'
 import { executionsQuery, partnerTxHashQuery, requestsUserQuery } from './api/history'
-import { getErrorMsg } from '../Arbitrum/ArbitrumBridge.utils'
+import { getErrorMsg, QUERY_ETH_PRICE } from '../Arbitrum/ArbitrumBridge.utils'
 import { omniBridgeSelectors } from './OmniBridge.selectors'
+import { subgraphClientsUris } from '../../../apollo/client'
 
 export class OmniBridge extends EcoBridgeChildBase {
   private _homeChainId: ChainId
@@ -80,7 +81,6 @@ export class OmniBridge extends EcoBridgeChildBase {
     this.setSignerData({ account, activeChainId, activeProvider })
 
     await this._fetchHistory()
-    //TODO pending listeners
     this.startListeners()
   }
 
@@ -439,7 +439,7 @@ export class OmniBridge extends EcoBridgeChildBase {
   public fetchStaticLists = async () => undefined
 
   public getBridgingMetadata = async () => {
-    if (!this._activeProvider || !this._staticProviders || !this._account) {
+    if (!this._activeProvider || !this._activeChainId || !this._staticProviders || !this._account) {
       this.store.dispatch(this.actions.setBridgeDetailsStatus({ status: 'failed' }))
       return
     }
@@ -567,10 +567,31 @@ export class OmniBridge extends EcoBridgeChildBase {
       }
     }
 
+    let gas: undefined | string = undefined
+
+    try {
+      const GAS_COST = 260000
+
+      const gasPrice = await this._staticProviders[this._foreignChainId]?.getGasPrice()
+
+      if (!gasPrice) throw new Error('Cannot get gas price')
+
+      const {
+        bundle: { nativeCurrencyPrice }
+      } = await request(subgraphClientsUris[this._foreignChainId], QUERY_ETH_PRICE)
+
+      const gasCostInEth = formatEther(gasPrice.mul(GAS_COST))
+
+      gas = `${(Number(gasCostInEth) * Number(nativeCurrencyPrice)).toFixed(2)}$`
+    } catch (e) {
+      gas = undefined
+    }
+
     const details = {
       fee,
+      gas,
       receiveAmount: Number(formatUnits(toAmount.toString(), decimals)).toFixed(2),
-      estimateTime: '2 min',
+      estimateTime: '5 min',
       requestId: helperRequestId
     }
     this.store.dispatch(this.actions.setBridgeDetails(details))
