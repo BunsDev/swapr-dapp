@@ -13,7 +13,7 @@ import { omniBridgeSelectors } from '../OmniBridge/OmniBridge.selectors'
 
 /**
  * Each bridge declares in config which chainId pairs it supports.
- * SupportedChains are used to filter out bridges that doesn't support pair selected in the UI.
+ * SupportedChains are used to filter out bridges that doesn't support pair selected in the ui.
  *
  * @example
  *    // Bridge A supports: 1 - 100, 100-200
@@ -28,7 +28,7 @@ import { omniBridgeSelectors } from '../OmniBridge/OmniBridge.selectors'
  */
 
 export const selectSupportedBridges = createSelector(
-  [(state: AppState) => state.ecoBridge.UI.from.chainId, (state: AppState) => state.ecoBridge.UI.to.chainId],
+  [(state: AppState) => state.ecoBridge.ui.from.chainId, (state: AppState) => state.ecoBridge.ui.to.chainId],
   (fromChainId, toChainId) => {
     if (!fromChainId || !toChainId) return []
 
@@ -61,10 +61,10 @@ export const selectSupportedBridges = createSelector(
 
 export const selectBridgeTransactions = createSelector(
   [
-    arbitrumSelectors['arbitrum:testnet'].selectBridgeTxsSummary,
-    arbitrumSelectors['arbitrum:mainnet'].selectBridgeTxsSummary,
-    socketSelectors['socket'].selectBridgeTxsSummary,
-    omniBridgeSelectors['omnibridge:eth-xdai'].selectBridgeTxsSummary
+    omniBridgeSelectors['omnibridge:eth-xdai'].selectBridgeTxsSummary,
+    arbitrumSelectors['arbitrum:testnet'].selectBridgeTransactionsSummary,
+    arbitrumSelectors['arbitrum:mainnet'].selectBridgeTransactionsSummary,
+    socketSelectors['socket'].selectBridgeTransactionsSummary
   ],
   (txsSummaryTestnet, txsSummaryMainnet, txsSummarySocket, txsOmnibridgeEthGnosis) => {
     const txs = [...txsSummaryTestnet, ...txsSummaryMainnet, ...txsSummarySocket, ...txsOmnibridgeEthGnosis]
@@ -74,7 +74,7 @@ export const selectBridgeTransactions = createSelector(
 )
 
 export const selectBridgeFilteredTransactions = createSelector(
-  [selectBridgeTransactions, (state: AppState) => state.ecoBridge.UI.filter],
+  [selectBridgeTransactions, (state: AppState) => state.ecoBridge.ui.filter],
   (txs, txsFilter) => {
     const sortedTxs = txs.sort((firstTx, secondTx) => {
       if (firstTx.status === 'pending' && secondTx.status !== 'pending') return -1
@@ -102,7 +102,7 @@ export const selectBridgeFilteredTransactions = createSelector(
 )
 
 export const selectBridgeCollectableTx = createSelector(
-  [selectBridgeTransactions, (state: AppState) => state.ecoBridge.UI.collectableTxHash],
+  [selectBridgeTransactions, (state: AppState) => state.ecoBridge.ui.collectableTxHash],
   (txs, txHash) => {
     if (!txHash) {
       return txs.find(tx => tx.status === 'redeem')

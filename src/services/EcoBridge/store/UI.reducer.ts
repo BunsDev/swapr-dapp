@@ -17,7 +17,7 @@ type UIInitialState = Record<'from' | 'to', EcoBridgeInput> & {
     isLoading: boolean
     label: string
     isBalanceSufficient: boolean
-    approved: boolean
+    isApproved: boolean
   }
   collectableTxHash: string | null
   modal: BridgeModalState
@@ -45,7 +45,7 @@ const initialState: UIInitialState = {
     isLoading: false,
     label: 'Enter amount',
     isBalanceSufficient: false,
-    approved: false
+    isApproved: false
   },
   modal: {
     status: BridgeModalStatus.CLOSED,
@@ -61,7 +61,7 @@ const initialState: UIInitialState = {
 }
 
 export const ecoBridgeUISlice = createSlice({
-  name: 'UI',
+  name: 'ui',
   initialState,
   reducers: {
     setFrom(state, action: PayloadAction<Partial<EcoBridgeInput>>) {
@@ -137,9 +137,6 @@ export const ecoBridgeUISlice = createSlice({
       state.modal.fromChainId = action.payload.fromChainId
       state.modal.toChainId = action.payload.toChainId
     },
-    setModalDisclaimerText(state, action: PayloadAction<string>) {
-      state.modal.disclaimerText = action.payload
-    },
     setStatusButton(
       state,
       action: PayloadAction<{
@@ -147,10 +144,12 @@ export const ecoBridgeUISlice = createSlice({
         isLoading?: boolean
         label?: string
         isBalanceSufficient?: boolean
-        approved?: boolean
+        isApproved?: boolean
       }>
     ) {
-      const { isError, isLoading, label, isBalanceSufficient, approved } = action.payload
+      const { isError, isLoading, label, isBalanceSufficient, isApproved } = action.payload
+
+      if (isBalanceSufficient && isApproved && Number(state.from.value) === 0 && state.from.address === '') return
 
       if (isError !== undefined) {
         state.statusButton.isError = isError
@@ -166,8 +165,8 @@ export const ecoBridgeUISlice = createSlice({
         state.statusButton.isBalanceSufficient = isBalanceSufficient
       }
 
-      if (approved !== undefined) {
-        state.statusButton.approved = approved
+      if (isApproved !== undefined) {
+        state.statusButton.isApproved = isApproved
       }
     },
     setShowAvailableBridges(state, action: PayloadAction<boolean>) {

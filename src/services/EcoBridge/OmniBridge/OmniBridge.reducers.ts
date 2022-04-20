@@ -1,15 +1,15 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit'
 import { TransactionReceipt } from '@ethersproject/abstract-provider'
-import { AsyncState, BridgeDetails, BridgingDetailsErrorMessage, OmniBridgeList } from '../EcoBridge.types'
+import { SyncState, BridgeDetails, BridgingDetailsErrorMessage, OmniBridgeList } from '../EcoBridge.types'
 import { OmniBridgeTxn, TransactionMessage } from './OmniBridge.types'
 import { TokenList } from '@uniswap/token-lists'
 
 type InitialState = {
   transactions: { [txHash: string]: OmniBridgeTxn }
   lists: { [id: string]: TokenList }
-  listsStatus: AsyncState
+  listsStatus: SyncState
   bridgingDetails: BridgeDetails
-  bridgingDetailsStatus: AsyncState
+  bridgingDetailsStatus: SyncState
   lastMetadataCt: number
   bridgingDetailsErrorMessage?: BridgingDetailsErrorMessage
 }
@@ -17,9 +17,9 @@ type InitialState = {
 const initialState: InitialState = {
   transactions: {},
   lists: {},
-  listsStatus: 'idle',
+  listsStatus: SyncState.IDLE,
   bridgingDetails: {},
-  bridgingDetailsStatus: 'idle',
+  bridgingDetailsStatus: SyncState.IDLE,
   lastMetadataCt: 0
 }
 
@@ -79,11 +79,11 @@ export const createOmniBridgeSlice = (bridgeId: OmniBridgeList) =>
         }
 
         if (requestId !== state.lastMetadataCt) {
-          if (state.bridgingDetailsStatus === 'failed') return
-          state.bridgingDetailsStatus = 'loading'
+          if (state.bridgingDetailsStatus === SyncState.FAILED) return
+          state.bridgingDetailsStatus = SyncState.LOADING
           return
         } else {
-          state.bridgingDetailsStatus = 'ready'
+          state.bridgingDetailsStatus = SyncState.READY
         }
 
         if (gas) {
@@ -101,7 +101,7 @@ export const createOmniBridgeSlice = (bridgeId: OmniBridgeList) =>
       },
       setBridgeDetailsStatus: (
         state,
-        action: PayloadAction<{ status: AsyncState; errorMessage?: BridgingDetailsErrorMessage }>
+        action: PayloadAction<{ status: SyncState; errorMessage?: BridgingDetailsErrorMessage }>
       ) => {
         const { status, errorMessage } = action.payload
 
@@ -114,7 +114,7 @@ export const createOmniBridgeSlice = (bridgeId: OmniBridgeList) =>
       requestStarted: (state, action: PayloadAction<{ id: number }>) => {
         state.lastMetadataCt = action.payload.id
       },
-      setTokenListsStatus: (state, action: PayloadAction<AsyncState>) => {
+      setTokenListsStatus: (state, action: PayloadAction<SyncState>) => {
         state.listsStatus = action.payload
       },
       addTokenLists: (state, action: PayloadAction<{ [id: string]: TokenList }>) => {

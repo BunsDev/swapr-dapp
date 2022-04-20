@@ -27,7 +27,7 @@ import { useBytes32TokenContract, useTokenContract, useWrappingToken } from '../
 import { isAddress } from '../../utils'
 import { currencyId } from '../../utils/currencyId'
 
-import { BridgeTxsFilter } from './EcoBridge.types'
+import { BridgeModalData, BridgeModalState, BridgeModalStatus, BridgeTxsFilter } from './EcoBridge.types'
 import { WrappedTokenInfo } from '../../state/lists/wrapped-token-info'
 
 export const useBridgeSupportedTokens = () => {
@@ -119,23 +119,11 @@ export const useBridgeTokenInfo = (currency?: Currency, chainId?: ChainId): Wrap
   return retVal
 }
 
-export const useBridgeActiveTokenMap = () => {
-  const tokenMap = useSelector(selectBridgeActiveTokens)
+export const useBridgeActiveTokenMap = () => useSelector(selectBridgeActiveTokens)
 
-  return tokenMap
-}
+export const useBridgeSupportedLists = () => useSelector(selectSupportedLists)
 
-export const useBridgeSupportedLists = () => {
-  const supportedLists = useSelector(selectSupportedLists)
-
-  return supportedLists
-}
-
-export const useBridgeListsLoadingStatus = () => {
-  const isLoading = useSelector(selectBridgeListsLoadingStatus)
-
-  return isLoading
-}
+export const useBridgeListsLoadingStatus = () => useSelector(selectBridgeListsLoadingStatus)
 
 export const useActiveListsHandlers = () => {
   const dispatch = useDispatch()
@@ -150,7 +138,7 @@ export const useActiveListsHandlers = () => {
 
 export const useBridgeFetchDynamicLists = () => {
   const ecoBridge = useEcoBridge()
-  const { from, to } = useSelector((state: AppState) => state.ecoBridge.UI)
+  const { from, to } = useSelector((state: AppState) => state.ecoBridge.ui)
 
   useEffect(() => {
     if (from.chainId && to.chainId) {
@@ -159,23 +147,11 @@ export const useBridgeFetchDynamicLists = () => {
   }, [from.chainId, ecoBridge, to.chainId])
 }
 
-export const useShowAvailableBridges = () => {
-  const showAvailableBridges = useSelector((state: AppState) => state.ecoBridge.UI.showAvailableBridges)
+export const useShowAvailableBridges = () => useSelector((state: AppState) => state.ecoBridge.ui.showAvailableBridges)
 
-  return showAvailableBridges
-}
+export const useAvailableBridges = () => useSelector(selectSupportedBridgesForUI)
 
-export const useAvailableBridges = () => {
-  const availableBridges = useSelector(selectSupportedBridgesForUI)
-
-  return availableBridges.filter(bridge => bridge.status !== 'failed')
-}
-
-export const useActiveBridge = () => {
-  const activeBridge = useSelector((state: AppState) => state.ecoBridge.common.activeBridge)
-
-  return activeBridge
-}
+export const useActiveBridge = () => useSelector((state: AppState) => state.ecoBridge.common.activeBridge)
 
 export function useBridgeActionHandlers(): {
   onCurrencySelection: (currency: Currency | string) => void
@@ -186,8 +162,8 @@ export function useBridgeActionHandlers(): {
 } {
   const dispatch = useDispatch()
 
-  const fromChainId = useSelector((state: AppState) => state.ecoBridge.UI.from.chainId)
-  const toChainId = useSelector((state: AppState) => state.ecoBridge.UI.to.chainId)
+  const fromChainId = useSelector((state: AppState) => state.ecoBridge.ui.from.chainId)
+  const toChainId = useSelector((state: AppState) => state.ecoBridge.ui.to.chainId)
 
   const onFromNetworkChange = useCallback(
     (chainId: ChainId) => {
@@ -225,7 +201,7 @@ export function useBridgeActionHandlers(): {
           symbol: currency instanceof Currency ? currency.symbol : ''
         })
       )
-      // dispatch(ecoBridgeUIActions.setTo({ address: currency instanceof Currency ? currencyId(currency) : currency }))
+      dispatch(commonActions.setActiveBridge(undefined))
     },
     [dispatch]
   )
@@ -233,7 +209,7 @@ export function useBridgeActionHandlers(): {
   const onUserInput = useCallback(
     (typedValue: string) => {
       dispatch(ecoBridgeUIActions.setFrom({ value: typedValue }))
-      // dispatch(ecoBridgeUIActions.setTo({ value: '' }))
+
       dispatch(commonActions.setActiveBridge(undefined))
     },
     [dispatch]
@@ -251,8 +227,8 @@ export function useBridgeActionHandlers(): {
 export const useBridgeInfo = () => {
   const { account, chainId } = useActiveWeb3React()
 
-  const fromNetwork = useSelector((state: AppState) => state.ecoBridge.UI.from)
-  const toChainId = useSelector((state: AppState) => state.ecoBridge.UI.to.chainId)
+  const fromNetwork = useSelector((state: AppState) => state.ecoBridge.ui.from)
+  const toChainId = useSelector((state: AppState) => state.ecoBridge.ui.to.chainId)
 
   const { address: currencyId, value: typedValue, chainId: fromChainId } = fromNetwork
 
@@ -297,7 +273,7 @@ export const useBridgeCollectHandlers = () => {
   const { account } = useActiveWeb3React()
   const collectableTx = useSelector((state: AppState) => selectBridgeCollectableTx(state, account ?? undefined))
 
-  const [collecting, setCollecting] = useState(false)
+  const [isCollecting, setIsCollecting] = useState(false)
 
   const setCollectableTx = useCallback(
     (txHash: string | null) => {
@@ -310,10 +286,57 @@ export const useBridgeCollectHandlers = () => {
   const nativeCurrency = useNativeCurrency(collectableTx?.toChainId)
 
   return {
-    collecting,
-    setCollecting,
+    isCollecting,
+    setIsCollecting,
     collectableTx,
     setCollectableTx,
     collectableCurrency: collectableCurrency ?? nativeCurrency
+  }
+}
+
+export const useBridgeModal = (): {
+  modalData: BridgeModalState
+  setModalState: (status: BridgeModalStatus, error?: string) => void
+  setModalData: ({ symbol, typedValue, fromChainId, toChainId }: BridgeModalData) => void
+} => {
+  const { fromChainId, status, symbol, toChainId, typedValue, error, disclaimerText } = useSelector(
+    (state: AppState) => state.ecoBridge.ui.modal
+  )
+
+  const dispatch = useDispatch()
+
+  const setModalState = useCallback(
+    (status: BridgeModalStatus, error?: string) => {
+      dispatch(ecoBridgeUIActions.setBridgeModalStatus({ status, error }))
+    },
+    [dispatch]
+  )
+
+  const setModalData = useCallback(
+    ({ symbol, typedValue, fromChainId, toChainId }: BridgeModalData) => {
+      dispatch(
+        ecoBridgeUIActions.setBridgeModalData({
+          symbol: symbol ?? '',
+          typedValue,
+          fromChainId,
+          toChainId
+        })
+      )
+    },
+    [dispatch]
+  )
+
+  return {
+    modalData: {
+      status,
+      symbol,
+      typedValue,
+      fromChainId,
+      toChainId,
+      error,
+      disclaimerText
+    },
+    setModalState,
+    setModalData
   }
 }

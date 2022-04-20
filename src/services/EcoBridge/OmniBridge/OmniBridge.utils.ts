@@ -592,24 +592,24 @@ export const getTransactionStatus = (
   isFailed: boolean,
   hasSignatures: boolean
 ): BridgeTransactionStatus => {
-  if (status === 'pending') {
-    return 'pending'
+  if (status === BridgeTransactionStatus.PENDING) {
+    return BridgeTransactionStatus.PENDING
   }
 
   if (!isClaimed) {
-    return 'redeem'
+    return BridgeTransactionStatus.REDEEM
   }
 
   if (isClaimed) {
     if (isFailed) {
-      return 'failed'
+      return BridgeTransactionStatus.FAILED
     }
     if (hasSignatures) {
-      return 'claimed'
+      return BridgeTransactionStatus.CLAIMED
     }
-    return 'confirmed'
+    return BridgeTransactionStatus.CONFIRMED
   }
-  return 'loading'
+  return BridgeTransactionStatus.LOADING
 }
 
 //collect

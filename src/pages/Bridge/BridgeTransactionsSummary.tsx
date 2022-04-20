@@ -125,7 +125,7 @@ interface BridgeTransactionsSummaryProps {
 
 export const BridgeTransactionsSummary = ({ transactions, handleTriggerCollect }: BridgeTransactionsSummaryProps) => {
   return (
-    <AdvancedDetailsFooter style={{ marginTop: '10px' }} fullWidth padding="12px">
+    <AdvancedDetailsFooter fullWidth padding="12px">
       <Container>
         <Header>
           <ColumnBridging>Bridging</ColumnBridging>
@@ -173,7 +173,7 @@ const BridgeTransactionsSummaryRow = ({ tx, handleTriggerCollect }: BridgeTransa
       </ColumnFrom>
       <ColumnToFlex>
         <Filler>
-          <Dots status={'confirmed'} />
+          <Dots status={BridgeTransactionStatus.CONFIRMED} />
           <Dots status={status} />
         </Filler>
         <TextTo

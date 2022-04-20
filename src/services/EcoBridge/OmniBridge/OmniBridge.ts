@@ -7,7 +7,8 @@ import {
   EcoBridgeChangeHandler,
   EcoBridgeChildBaseConstructor,
   EcoBridgeChildBaseInit,
-  OmniBridgeList
+  OmniBridgeList,
+  SyncState
 } from '../EcoBridge.types'
 import { EcoBridgeChildBase } from '../EcoBridge.utils'
 import {
@@ -174,7 +175,7 @@ export class OmniBridge extends EcoBridgeChildBase {
         isError: false,
         isLoading: true,
         isBalanceSufficient: true,
-        approved: false
+        isApproved: false
       })
     )
 
@@ -187,7 +188,7 @@ export class OmniBridge extends EcoBridgeChildBase {
           isError: false,
           isLoading: false,
           isBalanceSufficient: true,
-          approved: true
+          isApproved: true
         })
       )
     }
@@ -197,7 +198,7 @@ export class OmniBridge extends EcoBridgeChildBase {
     try {
       this.store.dispatch(ecoBridgeUIActions.setBridgeModalStatus({ status: BridgeModalStatus.PENDING }))
 
-      const collectableTxHash = this.store.getState().ecoBridge.UI.collectableTxHash
+      const collectableTxHash = this.store.getState().ecoBridge.ui.collectableTxHash
       const transactions = this.store.getState().ecoBridge[this.bridgeId as OmniBridgeList].transactions
 
       if (!collectableTxHash) return
@@ -280,7 +281,7 @@ export class OmniBridge extends EcoBridgeChildBase {
         isError: false,
         isLoading: true,
         isBalanceSufficient: false,
-        approved: false
+        isApproved: false
       })
     )
 
@@ -301,7 +302,7 @@ export class OmniBridge extends EcoBridgeChildBase {
           isError: false,
           isLoading: false,
           isBalanceSufficient: false,
-          approved: false
+          isApproved: false
         })
       )
       return
@@ -314,7 +315,7 @@ export class OmniBridge extends EcoBridgeChildBase {
           isError: false,
           isLoading: false,
           isBalanceSufficient: false,
-          approved: false
+          isApproved: false
         })
       )
       return
@@ -333,7 +334,7 @@ export class OmniBridge extends EcoBridgeChildBase {
           isError: false,
           isLoading: false,
           isBalanceSufficient: false,
-          approved: false
+          isApproved: false
         })
       )
       return
@@ -346,7 +347,7 @@ export class OmniBridge extends EcoBridgeChildBase {
           isError: false,
           isLoading: false,
           isBalanceSufficient: true,
-          approved: true
+          isApproved: true
         })
       )
     } else {
@@ -356,7 +357,7 @@ export class OmniBridge extends EcoBridgeChildBase {
           isError: false,
           isLoading: false,
           isBalanceSufficient: true,
-          approved: false
+          isApproved: false
         })
       )
     }
@@ -366,16 +367,16 @@ export class OmniBridge extends EcoBridgeChildBase {
     try {
       if (!this._activeChainId) return
 
-      const { from, to } = this.store.getState().ecoBridge.UI
+      const { from, to } = this.store.getState().ecoBridge.ui
 
       const selectedChains = [from.chainId, to.chainId]
 
       if (!(selectedChains.includes(this._foreignChainId) && selectedChains.includes(this._homeChainId))) {
-        this.store.dispatch(this.actions.setTokenListsStatus('ready'))
+        this.store.dispatch(this.actions.setTokenListsStatus(SyncState.READY))
         return
       }
 
-      this.store.dispatch(this.actions.setTokenListsStatus('loading'))
+      this.store.dispatch(this.actions.setTokenListsStatus(SyncState.LOADING))
 
       const homeEndpoint = getGraphEndpoint(from.chainId, this.bridgeId)
       const foreignEndpoint = getGraphEndpoint(to.chainId, this.bridgeId)
@@ -430,9 +431,9 @@ export class OmniBridge extends EcoBridgeChildBase {
       }
 
       this.store.dispatch(this.actions.addTokenLists({ [this.bridgeId]: tokenList }))
-      this.store.dispatch(this.actions.setTokenListsStatus('ready'))
+      this.store.dispatch(this.actions.setTokenListsStatus(SyncState.READY))
     } catch (e) {
-      this.store.dispatch(this.actions.setTokenListsStatus('failed'))
+      this.store.dispatch(this.actions.setTokenListsStatus(SyncState.FAILED))
     }
   }
 
@@ -440,13 +441,13 @@ export class OmniBridge extends EcoBridgeChildBase {
 
   public getBridgingMetadata = async () => {
     if (!this._activeProvider || !this._activeChainId || !this._staticProviders || !this._account) {
-      this.store.dispatch(this.actions.setBridgeDetailsStatus({ status: 'failed' }))
+      this.store.dispatch(this.actions.setBridgeDetailsStatus({ status: SyncState.FAILED }))
       return
     }
-    const { address, chainId, name, value, decimals, symbol } = this.store.getState().ecoBridge.UI.from
+    const { address, chainId, name, value, decimals, symbol } = this.store.getState().ecoBridge.ui.from
 
     if (Number(value) === 0) {
-      this.store.dispatch(this.actions.setBridgeDetailsStatus({ status: 'idle' }))
+      this.store.dispatch(this.actions.setBridgeDetailsStatus({ status: SyncState.IDLE }))
       return
     }
 
@@ -456,10 +457,10 @@ export class OmniBridge extends EcoBridgeChildBase {
 
     this.store.dispatch(this.actions.requestStarted({ id: helperRequestId }))
 
-    this.store.dispatch(this.actions.setBridgeDetailsStatus({ status: 'loading' }))
+    this.store.dispatch(this.actions.setBridgeDetailsStatus({ status: SyncState.LOADING }))
 
     if (address === Currency.getNative(this._homeChainId).symbol) {
-      this.store.dispatch(this.actions.setBridgeDetailsStatus({ status: 'failed' }))
+      this.store.dispatch(this.actions.setBridgeDetailsStatus({ status: SyncState.FAILED }))
       return
     }
 
@@ -474,7 +475,7 @@ export class OmniBridge extends EcoBridgeChildBase {
     const fromTokenMediator = getMediatorAddress(this.bridgeId, { address, chainId })
 
     if (!fromTokenMediator || !fromTokenMode || !name) {
-      this.store.dispatch(this.actions.setBridgeDetailsStatus({ status: 'failed' }))
+      this.store.dispatch(this.actions.setBridgeDetailsStatus({ status: SyncState.FAILED }))
       return
     }
 
@@ -486,7 +487,7 @@ export class OmniBridge extends EcoBridgeChildBase {
     )
 
     if (!toToken) {
-      this.store.dispatch(this.actions.setBridgeDetailsStatus({ status: 'failed' }))
+      this.store.dispatch(this.actions.setBridgeDetailsStatus({ status: SyncState.FAILED }))
       return
     }
 
@@ -494,14 +495,14 @@ export class OmniBridge extends EcoBridgeChildBase {
     try {
       parsedFromAmount = parseUnits(value, decimals)
     } catch (e) {
-      this.store.dispatch(this.actions.setBridgeDetailsStatus({ status: 'failed' }))
+      this.store.dispatch(this.actions.setBridgeDetailsStatus({ status: SyncState.FAILED }))
       return
     }
 
     const feesData = await calculateFees(this.bridgeId, this._staticProviders[this._homeChainId])
 
     if (!feesData) {
-      this.store.dispatch(this.actions.setBridgeDetailsStatus({ status: 'failed' }))
+      this.store.dispatch(this.actions.setBridgeDetailsStatus({ status: SyncState.FAILED }))
       return
     }
 
@@ -595,17 +596,6 @@ export class OmniBridge extends EcoBridgeChildBase {
       requestId: helperRequestId
     }
     this.store.dispatch(this.actions.setBridgeDetails(details))
-  }
-
-  public triggerModalDisclaimerText = () => {
-    const fromName = this._activeChainId === this._homeChainId ? 'Gnosis' : 'Mainnet'
-    const toName = this._activeChainId !== this._foreignChainId ? 'Mainnet' : 'Gnosis'
-
-    this.store.dispatch(
-      ecoBridgeUIActions.setModalDisclaimerText(
-        `Please confirm that you would like to send your funds from ${fromName} to ${toName}. `
-      )
-    )
   }
 
   private _fetchHistory = async () => {
