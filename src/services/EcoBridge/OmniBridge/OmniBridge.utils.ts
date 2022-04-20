@@ -17,6 +17,12 @@ export const nativeCurrencyMediators: { [chainId: number]: string } = {
   1: '0xa6439ca0fcba1d0f80df0be6a17220fed9c9038a'.toLowerCase()
 }
 
+export const VERSION = {
+  major: 1,
+  minor: 0,
+  patch: 0
+}
+
 const ADDRESS_ZERO = ethers.constants.AddressZero
 
 //subgraph

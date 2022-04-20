@@ -7,7 +7,7 @@ import { ecoBridgeConfig } from '../EcoBridge.config'
 import { listToTokenMap } from '../../../state/lists/hooks'
 import { socketSelectors } from '../Socket/Socket.selectors'
 import { arbitrumSelectors } from '../Arbitrum/ArbitrumBridge.selectors'
-import { BridgeList, BridgeTxsFilter, SupportedBridges, TokenMap } from '../EcoBridge.types'
+import { BridgeList, BridgeTxsFilter, SupportedBridges, SyncState, TokenMap } from '../EcoBridge.types'
 import { DEFAULT_TOKEN_LIST } from '../../../constants'
 import { omniBridgeSelectors } from '../OmniBridge/OmniBridge.selectors'
 
@@ -61,7 +61,7 @@ export const selectSupportedBridges = createSelector(
 
 export const selectBridgeTransactions = createSelector(
   [
-    omniBridgeSelectors['omnibridge:eth-xdai'].selectBridgeTxsSummary,
+    omniBridgeSelectors['omnibridge:eth-xdai'].selectBridgeTransactionsSummary,
     arbitrumSelectors['arbitrum:testnet'].selectBridgeTransactionsSummary,
     arbitrumSelectors['arbitrum:mainnet'].selectBridgeTransactionsSummary,
     socketSelectors['socket'].selectBridgeTransactionsSummary
@@ -274,6 +274,6 @@ export const selectSupportedBridgesForUI = createSelector(
       return total
     }, [])
 
-    return supportedBridges
+    return supportedBridges.filter(bridge => bridge.status !== SyncState.FAILED)
   }
 )

@@ -1,11 +1,12 @@
-import { createSlice, PayloadAction } from '@reduxjs/toolkit'
+import { createSlice, PayloadAction, EntityState } from '@reduxjs/toolkit'
 import { TransactionReceipt } from '@ethersproject/abstract-provider'
 import { SyncState, BridgeDetails, BridgingDetailsErrorMessage, OmniBridgeList } from '../EcoBridge.types'
 import { OmniBridgeTxn, TransactionMessage } from './OmniBridge.types'
 import { TokenList } from '@uniswap/token-lists'
+import { omniTransactionsAdapter } from './OmniBridge.adapter'
 
 type InitialState = {
-  transactions: { [txHash: string]: OmniBridgeTxn }
+  transactions: EntityState<OmniBridgeTxn>
   lists: { [id: string]: TokenList }
   listsStatus: SyncState
   bridgingDetails: BridgeDetails
@@ -15,7 +16,7 @@ type InitialState = {
 }
 
 const initialState: InitialState = {
-  transactions: {},
+  transactions: omniTransactionsAdapter.getInitialState({}),
   lists: {},
   listsStatus: SyncState.IDLE,
   bridgingDetails: {},
@@ -29,46 +30,25 @@ export const createOmniBridgeSlice = (bridgeId: OmniBridgeList) =>
     initialState,
     reducers: {
       addTransactions: (state, action: PayloadAction<OmniBridgeTxn[]>) => {
-        action.payload.forEach(txn => {
-          if (!txn.txHash) return
-
-          const { txHash } = txn
-
-          if (state.transactions[txHash]) return
-
-          state.transactions[txHash] = {
-            ...txn
-          }
-        })
+        omniTransactionsAdapter.upsertMany(state.transactions, action.payload)
       },
-      addTx: (state, action: PayloadAction<OmniBridgeTxn>) => {
+      addTransaction: (state, action: PayloadAction<OmniBridgeTxn>) => {
         const { payload: txn } = action
 
         if (!txn.txHash) return
 
-        const { txHash } = txn
-
-        if (state.transactions[txHash]) return
-
-        state.transactions[txHash] = {
-          ...txn
-        }
+        omniTransactionsAdapter.upsertOne(state.transactions, txn)
       },
-      updateTx: (state, action: PayloadAction<{ txHash: string; receipt: TransactionReceipt }>) => {
+      updateTransaction: (state, action: PayloadAction<{ txHash: string; receipt: TransactionReceipt }>) => {
         const { receipt, txHash } = action.payload
 
-        if (!state.transactions[txHash]) {
-          throw Error('Transaction not found')
-        }
-
-        const txn = state.transactions[txHash]
-
-        if (txn.receipt) return
-
-        txn.receipt = receipt
-        txn.timestampResolved = Date.now()
-
-        state.transactions[txHash] = txn
+        omniTransactionsAdapter.updateOne(state.transactions, {
+          id: txHash,
+          changes: {
+            receipt,
+            timestampResolved: Date.now()
+          }
+        })
       },
       setBridgeDetails: (state, action: PayloadAction<BridgeDetails>) => {
         const { gas, fee, estimateTime, receiveAmount, requestId } = action.payload
@@ -135,14 +115,29 @@ export const createOmniBridgeSlice = (bridgeId: OmniBridgeList) =>
         if (!txHash) return
 
         if (partnerTxHash) {
-          state.transactions[txHash].partnerTxHash = partnerTxHash
+          omniTransactionsAdapter.updateOne(state.transactions, {
+            id: txHash,
+            changes: {
+              partnerTxHash
+            }
+          })
         }
 
         if (message) {
-          state.transactions[txHash].message = message
+          omniTransactionsAdapter.updateOne(state.transactions, {
+            id: txHash,
+            changes: {
+              message
+            }
+          })
         }
         if (status !== undefined) {
-          state.transactions[txHash].status = status
+          omniTransactionsAdapter.updateOne(state.transactions, {
+            id: txHash,
+            changes: {
+              status
+            }
+          })
         }
       }
     }

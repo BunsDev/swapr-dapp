@@ -32,7 +32,8 @@ import {
   messageCallStatus,
   relayTokens,
   requiredSignatures,
-  timeout
+  timeout,
+  VERSION
 } from './OmniBridge.utils'
 import { omniBridgeActions } from './OmniBridge.reducers'
 import { foreignTokensQuery, homeTokensQuery } from './api/tokens'
@@ -46,6 +47,7 @@ import { executionsQuery, partnerTxHashQuery, requestsUserQuery } from './api/hi
 import { getErrorMsg, QUERY_ETH_PRICE } from '../Arbitrum/ArbitrumBridge.utils'
 import { omniBridgeSelectors } from './OmniBridge.selectors'
 import { subgraphClientsUris } from '../../../apollo/client'
+import { BridgeTransactionStatus } from '../../../state/bridgeTransactions/types'
 
 export class OmniBridge extends EcoBridgeChildBase {
   private _homeChainId: ChainId
@@ -134,7 +136,7 @@ export class OmniBridge extends EcoBridgeChildBase {
       this.store.dispatch(ecoBridgeUIActions.setBridgeModalStatus({ status: BridgeModalStatus.INITIATED }))
 
       this.store.dispatch(
-        this.actions.addTx({
+        this.actions.addTransaction({
           assetName: fromToken.symbol ?? '',
           fromChainId,
           toChainId,
@@ -142,14 +144,14 @@ export class OmniBridge extends EcoBridgeChildBase {
           txHash: tx.hash,
           value: formatUnits(amount.toString(), decimals),
           needsClaiming,
-          status: 'pending'
+          status: BridgeTransactionStatus.PENDING
         })
       )
 
       const receipt = await tx.wait()
 
       if (receipt) {
-        this.store.dispatch(this.actions.updateTx({ txHash: receipt.transactionHash, receipt }))
+        this.store.dispatch(this.actions.updateTransaction({ txHash: receipt.transactionHash, receipt }))
       }
     } catch (e) {
       this.store.dispatch(
@@ -253,7 +255,7 @@ export class OmniBridge extends EcoBridgeChildBase {
         this._activeProvider.getSigner()
       )
 
-      this.store.dispatch(this.actions.updatePartnerTransaction({ txHash, status: 'pending' }))
+      this.store.dispatch(this.actions.updatePartnerTransaction({ txHash, status: BridgeTransactionStatus.PENDING }))
 
       this.store.dispatch(ecoBridgeUIActions.setBridgeModalStatus({ status: BridgeModalStatus.COLLECTING }))
 
@@ -422,11 +424,7 @@ export class OmniBridge extends EcoBridgeChildBase {
       const tokenList: TokenList = {
         name: 'OmniBridge',
         timestamp: new Date().toISOString(),
-        version: {
-          major: 1,
-          minor: 0,
-          patch: 0
-        },
+        version: VERSION,
         tokens
       }
 
@@ -643,7 +641,7 @@ export class OmniBridge extends EcoBridgeChildBase {
   private pendingTxListener = async () => {
     try {
       if (!this._account || !this._staticProviders) return
-      const pendingTxs = this.selectors.selectPendingTxs(this.store.getState(), this._account)
+      const pendingTxs = this.selectors.selectPendingTransactions(this.store.getState(), this._account)
 
       if (!pendingTxs.length) return
 

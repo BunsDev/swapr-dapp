@@ -1,8 +1,8 @@
 import { createSelector } from '@reduxjs/toolkit'
 import { AppState } from '../../../state'
-import { BridgeTransactionSummary } from '../../../state/bridgeTransactions/types'
+import { BridgeTransactionStatus, BridgeTransactionSummary } from '../../../state/bridgeTransactions/types'
 import { OmniBridgeList } from '../EcoBridge.types'
-import { OmniBridgeTxn } from './OmniBridge.types'
+import { omniTransactionsAdapter } from './OmniBridge.adapter'
 import { getTransactionStatus } from './OmniBridge.utils'
 
 const createSelectBridgingDetails = (bridgeId: OmniBridgeList) =>
@@ -22,32 +22,28 @@ const createSelectBridgingDetails = (bridgeId: OmniBridgeList) =>
     }
   )
 
-const createSelectOwnedTxs = (bridgeId: OmniBridgeList) =>
-  createSelector(
-    [
-      (state: AppState) => state.ecoBridge[bridgeId].transactions,
-      (state: AppState, account: string | undefined) => account
-    ],
-    (txs, account) => {
-      let ownedTxs: OmniBridgeTxn[] = []
-
-      if (account) {
-        ownedTxs = Object.values(txs).reduce<OmniBridgeTxn[]>((totalTxs, tx) => {
-          if (account.toLowerCase() === tx.sender.toLowerCase()) {
-            totalTxs.push(tx)
-          }
-
-          return totalTxs
-        }, [])
-      }
-
-      return ownedTxs
-    }
+const createSelectOwnedTransactions = (bridgeId: OmniBridgeList) => {
+  const transactionsSelector = createSelector(
+    [(state: AppState) => state.ecoBridge[bridgeId].transactions],
+    transactions => omniTransactionsAdapter.getSelectors().selectAll(transactions)
   )
 
-const createSelectBridgeTxsSummary = (
+  return createSelector(
+    [transactionsSelector, (state: AppState, account: string | undefined) => account],
+    (txs, account) => {
+      if (account) {
+        const normalizedAccount = account.toLowerCase()
+
+        return txs.filter(tx => tx.sender.toLowerCase() === normalizedAccount)
+      }
+      return []
+    }
+  )
+}
+
+const createSelectBridgeTransactionsSummary = (
   bridgeId: OmniBridgeList,
-  selectOwnedTxs: ReturnType<typeof createSelectOwnedTxs>
+  selectOwnedTxs: ReturnType<typeof createSelectOwnedTransactions>
 ) =>
   createSelector([selectOwnedTxs], txs => {
     const summaries = txs.map(tx => {
@@ -59,7 +55,7 @@ const createSelectBridgeTxsSummary = (
 
       const transactionStatus = getTransactionStatus(status, isClaimed, isFailed, hasSignatures)
 
-      const pendingReason = status === 'pending' ? 'Transaction has not been confirmed yet' : ''
+      const pendingReason = status === BridgeTransactionStatus.PENDING ? 'Transaction has not been confirmed yet' : ''
 
       const summary: BridgeTransactionSummary = {
         txHash,
@@ -76,7 +72,10 @@ const createSelectBridgeTxsSummary = (
       if (partnerTxHash) {
         summary.log.push({ chainId: toChainId, txHash: partnerTxHash })
       }
-      if (transactionStatus === 'claimed' || transactionStatus === 'confirmed') {
+      if (
+        transactionStatus === BridgeTransactionStatus.CLAIMED ||
+        transactionStatus === BridgeTransactionStatus.CONFIRMED
+      ) {
         summary.timestampResolved = timestampResolved
       }
 
@@ -85,31 +84,29 @@ const createSelectBridgeTxsSummary = (
     return summaries
   })
 
-const createSelectPendingTransactions = (selectOwnedTxs: ReturnType<typeof createSelectOwnedTxs>) =>
-  createSelector([selectOwnedTxs], txs => {
-    return txs.filter(tx => tx.status === 'pending')
-  })
+const createSelectPendingTransactions = (selectOwnedTxs: ReturnType<typeof createSelectOwnedTransactions>) =>
+  createSelector([selectOwnedTxs], txs => txs.filter(tx => tx.status === BridgeTransactionStatus.PENDING))
 
 export interface OmniBridgeSelectors {
   selectBridgingDetails: ReturnType<typeof createSelectBridgingDetails>
-  selectOwnedTxs: ReturnType<typeof createSelectOwnedTxs>
-  selectBridgeTxsSummary: ReturnType<typeof createSelectBridgeTxsSummary>
-  selectPendingTxs: ReturnType<typeof createSelectPendingTransactions>
+  selectOwnedTransactions: ReturnType<typeof createSelectOwnedTransactions>
+  selectBridgeTransactionsSummary: ReturnType<typeof createSelectBridgeTransactionsSummary>
+  selectPendingTransactions: ReturnType<typeof createSelectPendingTransactions>
 }
 
 export const omniBridgeSelectorsFactory = (omniBridges: OmniBridgeList[]) => {
   return omniBridges.reduce(
     (total, bridgeId) => {
       const selectBridgingDetails = createSelectBridgingDetails(bridgeId)
-      const selectOwnedTxs = createSelectOwnedTxs(bridgeId)
-      const selectBridgeTxsSummary = createSelectBridgeTxsSummary(bridgeId, selectOwnedTxs)
-      const selectPendingTxs = createSelectPendingTransactions(selectOwnedTxs)
+      const selectOwnedTransactions = createSelectOwnedTransactions(bridgeId)
+      const selectBridgeTransactionsSummary = createSelectBridgeTransactionsSummary(bridgeId, selectOwnedTransactions)
+      const selectPendingTransactions = createSelectPendingTransactions(selectOwnedTransactions)
 
       const selectors = {
         selectBridgingDetails,
-        selectOwnedTxs,
-        selectBridgeTxsSummary,
-        selectPendingTxs
+        selectOwnedTransactions,
+        selectBridgeTransactionsSummary,
+        selectPendingTransactions
       }
 
       total[bridgeId] = selectors
