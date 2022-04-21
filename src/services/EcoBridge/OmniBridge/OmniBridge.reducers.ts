@@ -1,19 +1,9 @@
-import { createSlice, PayloadAction, EntityState } from '@reduxjs/toolkit'
+import { createSlice, PayloadAction } from '@reduxjs/toolkit'
 import { TransactionReceipt } from '@ethersproject/abstract-provider'
 import { SyncState, BridgeDetails, BridgingDetailsErrorMessage, OmniBridgeList } from '../EcoBridge.types'
-import { OmniBridgeTxn, TransactionMessage } from './OmniBridge.types'
+import { InitialState, OmniBridgeTxn, TransactionMessage } from './OmniBridge.types'
 import { TokenList } from '@uniswap/token-lists'
 import { omniTransactionsAdapter } from './OmniBridge.adapter'
-
-type InitialState = {
-  transactions: EntityState<OmniBridgeTxn>
-  lists: { [id: string]: TokenList }
-  listsStatus: SyncState
-  bridgingDetails: BridgeDetails
-  bridgingDetailsStatus: SyncState
-  lastMetadataCt: number
-  bridgingDetailsErrorMessage?: BridgingDetailsErrorMessage
-}
 
 const initialState: InitialState = {
   transactions: omniTransactionsAdapter.getInitialState({}),
