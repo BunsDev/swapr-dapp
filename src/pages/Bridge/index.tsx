@@ -292,11 +292,7 @@ export default function Bridge() {
             disableCurrencySelect={!account || isCollecting || !isNetworkConnected}
             disabled={!account || isCollecting || !isNetworkConnected}
             id="bridge-currency-input"
-            hideBalance={
-              isCollecting && collectableTx
-                ? ![collectableTx.fromChainId, collectableTx.toChainId].includes(chainId ?? 0)
-                : false
-            }
+            hideBalance={isCollecting && collectableTx ? true : false}
             isLoading={!!account && isNetworkConnected && listsLoading}
             chainIdOverride={isCollecting && collectableTx ? collectableTx.toChainId : undefined}
           />

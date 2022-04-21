@@ -576,11 +576,12 @@ export const combineTransactions = (
   requests.map(request => {
     const execution = executions.find(exec => exec.messageId === request.messageId)
 
-    const { amount, txHash, symbol, timestamp, user, message, decimals } = request
+    const { amount, txHash, symbol, timestamp, user, message, decimals, token } = request
 
     return {
       txHash,
       assetName: symbol,
+      assetAddressL1: token,
       value: formatUnits(amount, decimals),
       fromChainId: chainId,
       toChainId: bridgeChainId,

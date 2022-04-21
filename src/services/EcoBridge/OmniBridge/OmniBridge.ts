@@ -138,6 +138,8 @@ export class OmniBridge extends EcoBridgeChildBase {
       this.store.dispatch(
         this.actions.addTransaction({
           assetName: fromToken.symbol ?? '',
+          assetAddressL1: fromToken.address,
+          assetAddressL2: toToken.address,
           fromChainId,
           toChainId,
           sender: this._account,

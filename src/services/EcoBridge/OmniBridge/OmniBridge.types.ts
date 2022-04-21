@@ -38,6 +38,8 @@ export type TransactionMessage = {
 export type OmniBridgeTxn = {
   txHash: string
   assetName: string
+  assetAddressL1?: string
+  assetAddressL2?: string
   value: string
   fromChainId: ChainId
   toChainId: ChainId

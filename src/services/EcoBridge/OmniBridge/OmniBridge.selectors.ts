@@ -47,7 +47,19 @@ const createSelectBridgeTransactionsSummary = (
 ) =>
   createSelector([selectOwnedTxs], txs => {
     const summaries = txs.map(tx => {
-      const { txHash, value, timestampResolved, assetName, fromChainId, toChainId, partnerTxHash, status, message } = tx
+      const {
+        txHash,
+        value,
+        timestampResolved,
+        assetName,
+        fromChainId,
+        toChainId,
+        partnerTxHash,
+        status,
+        message,
+        assetAddressL1,
+        assetAddressL2
+      } = tx
 
       const isClaimed = !!partnerTxHash
       const isFailed = !!partnerTxHash && status === false
@@ -66,7 +78,9 @@ const createSelectBridgeTransactionsSummary = (
         log: [{ chainId: fromChainId, txHash: txHash }],
         bridgeId,
         status: transactionStatus,
-        pendingReason
+        pendingReason,
+        assetAddressL1,
+        assetAddressL2
       }
 
       if (partnerTxHash) {
