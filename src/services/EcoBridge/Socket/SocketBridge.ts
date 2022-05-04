@@ -431,7 +431,6 @@ export class SocketBridge extends EcoBridgeChildBase {
 
     const { success, result } = quote
 
-    console.log(result)
     if (!success || result.routes.length === 0) {
       this.store.dispatch(
         this.actions.setBridgeDetailsStatus({
