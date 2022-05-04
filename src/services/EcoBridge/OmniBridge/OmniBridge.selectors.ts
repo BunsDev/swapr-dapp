@@ -1,6 +1,7 @@
 import { createSelector } from '@reduxjs/toolkit'
 import { AppState } from '../../../state'
 import { BridgeTransactionStatus, BridgeTransactionSummary } from '../../../state/bridgeTransactions/types'
+import { normalizeInputValue } from '../../../utils'
 import { OmniBridgeList } from '../EcoBridge.types'
 import { omniTransactionsAdapter } from './OmniBridge.adapter'
 import { getTransactionStatus } from './OmniBridge.utils'
@@ -69,10 +70,12 @@ const createSelectBridgeTransactionsSummary = (
 
       const pendingReason = status === BridgeTransactionStatus.PENDING ? 'Transaction has not been confirmed yet' : ''
 
+      const normalizedValue = normalizeInputValue(value, true)
+
       const summary: BridgeTransactionSummary = {
         txHash,
         assetName,
-        value,
+        value: normalizedValue,
         fromChainId,
         toChainId,
         log: [{ chainId: fromChainId, txHash: txHash }],
