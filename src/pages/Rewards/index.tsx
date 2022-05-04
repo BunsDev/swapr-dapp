@@ -17,7 +17,7 @@ import { useToken } from '../../hooks/Tokens'
 import DoubleCurrencyLogo from '../../components/DoubleLogo'
 import { PairState, usePair } from '../../data/Reserves'
 
-import PairSearchModal from '../../components/SearchModal/PairSearchModal'
+import { PairSearchModal } from '../../components/SearchModal/PairSearchModal'
 import { ButtonSecondary } from '../../components/Button'
 import { useLiquidityMiningFeatureFlag } from '../../hooks/useLiquidityMiningFeatureFlag'
 
@@ -168,7 +168,7 @@ export default function Rewards({
                     </Box>
                   )}
                   <Box mr="4px">
-                    <Text fontWeight="600" fontSize="16px" lineHeight="20px">
+                    <Text fontWeight="600" fontSize="16px" lineHeight="20px" data-testid="all-pairs">
                       {filterPair
                         ? `${unwrappedToken(filterPair.token0)?.symbol}/${unwrappedToken(filterPair.token1)?.symbol}`
                         : wrappedPair[0] === PairState.LOADING
@@ -196,7 +196,7 @@ export default function Rewards({
               </Flex>
               <ButtonRow>
                 {liquidityMiningEnabled && (
-                  <ResponsiveButtonSecondary as={Link} padding="8px 14px" to="/liquidity-mining/create">
+                  <ResponsiveButtonSecondary as={Link} padding="8px 14px" to="/liquidity-mining/create" data-testid="create-campaign">
                     <Text fontWeight={700} fontSize={12} lineHeight="15px">
                       CREATE CAMPAIGN
                     </Text>

@@ -22,7 +22,6 @@ import { AppState } from '../../state'
 import { selectBridgeFilteredTransactions } from '../../services/EcoBridge/store/EcoBridge.selectors'
 import { ecoBridgeUIActions } from '../../services/EcoBridge/store/UI.reducer'
 import { BridgeSelectionWindow } from './BridgeSelectionWindow'
-import CurrencyInputPanel from '../../components/CurrencyInputPanelBridge'
 import { useBridgeModal } from '../../services/EcoBridge/EcoBridge.hooks'
 import {
   useBridgeActionHandlers,
@@ -34,6 +33,7 @@ import {
   useShowAvailableBridges
 } from '../../services/EcoBridge/EcoBridge.hooks'
 import { BridgeModalStatus, BridgeTxsFilter } from '../../services/EcoBridge/EcoBridge.types'
+import { CurrencyInputPanelBridge } from '../../components/CurrencyInputPanel/CurrencyInputPanel.container'
 
 const Wrapper = styled.div`
   width: 100%;
@@ -77,6 +77,12 @@ const SwapButton = styled.button<{ disabled: boolean }>`
 
 const AssetWrapper = styled.div`
   flex: 1 0 35%;
+`
+
+const HistoryMessage = styled(Title)`
+  font-size: 16px;
+  font-weight: 300;
+  margin: 5px;
 `
 
 export default function Bridge() {
@@ -233,7 +239,7 @@ export default function Bridge() {
         handleTriggerCollect={handleTriggerCollect}
         firstTxnToCollect={collectableTx}
       />
-      {activeTab !== 'history' && (
+      {activeTab !== BridgeTab.HISTORY && (
         <AppBody>
           <RowBetween mb="12px">
             <Title>{isCollecting ? 'Collect' : 'Swapr Bridge'}</Title>
@@ -281,7 +287,7 @@ export default function Bridge() {
               />
             </AssetWrapper>
           </Row>
-          <CurrencyInputPanel
+          <CurrencyInputPanelBridge
             value={isCollecting && collectableTx ? collectableTx.value : typedValue}
             displayedValue={displayedValue}
             setDisplayedValue={setDisplayedValue}
@@ -308,9 +314,16 @@ export default function Bridge() {
           />
         </AppBody>
       )}
-      {activeTab === 'bridge' && showAvailableBridges && <BridgeSelectionWindow />}
+      {activeTab === BridgeTab.BRIDGE && showAvailableBridges && <BridgeSelectionWindow />}
       {!!bridgeSummaries.length && (
-        <BridgeTransactionsSummary transactions={bridgeSummaries} handleTriggerCollect={handleTriggerCollect} />
+        <BridgeTransactionsSummary
+          extraMargin={activeTab !== BridgeTab.HISTORY && !showAvailableBridges}
+          transactions={bridgeSummaries}
+          handleTriggerCollect={handleTriggerCollect}
+        />
+      )}
+      {activeTab === BridgeTab.HISTORY && !bridgeSummaries.length && (
+        <HistoryMessage>Your bridge transactions will appear here.</HistoryMessage>
       )}
       <BridgeModal
         handleResetBridge={handleResetBridge}

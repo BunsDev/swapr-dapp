@@ -1,17 +1,17 @@
-import { Trade } from '@swapr/sdk'
+import { UniswapV2Trade } from '@swapr/sdk'
 import React, { Fragment, memo, useContext } from 'react'
 import { ChevronRight } from 'react-feather'
 import { Flex } from 'rebass'
 import styled, { ThemeContext } from 'styled-components'
 import { TYPE } from '../../theme'
-import CurrencyLogo from '../CurrencyLogo'
+import { CurrencyLogo } from '../CurrencyLogo'
 
 const StyledChevronRight = styled(ChevronRight)`
   height: 17px;
   color: ${props => props.theme.purple3};
 `
 
-export default memo(function SwapRoute({ trade }: { trade: Trade }) {
+export default memo(function SwapRoute({ trade }: { trade: UniswapV2Trade }) {
   const theme = useContext(ThemeContext)
   return (
     <Flex width="100%" justifyContent="flex-end" alignItems="center">

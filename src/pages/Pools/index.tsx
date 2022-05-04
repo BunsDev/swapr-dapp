@@ -13,14 +13,14 @@ import { AutoColumn } from '../../components/Column'
 import { useActiveWeb3React } from '../../hooks'
 import { ReactComponent as ThreeBlurredCircles } from '../../assets/svg/three-blurred-circles.svg'
 import { ChevronDown, Plus, X } from 'react-feather'
-import CurrencySearchModal from '../../components/SearchModal/CurrencySearchModal'
+import { CurrencySearchModal } from '../../components/SearchModal/CurrencySearchModal'
 import { Currency, Token } from '@swapr/sdk'
 
 import { useAllPairsWithLiquidityAndMaximumApyAndStakingIndicator } from '../../hooks/useAllPairsWithLiquidityAndMaximumApyAndStakingIndicator'
 import { PairsFilterType } from '../../components/Pool/ListFilter'
 import { useLPPairs } from '../../hooks/useLiquidityPositions'
 import PairsList from '../../components/Pool/PairsList'
-import CurrencyLogo from '../../components/CurrencyLogo'
+import { CurrencyLogo } from '../../components/CurrencyLogo'
 import { useSwaprSinglelSidedStakeCampaigns } from '../../hooks/singleSidedStakeCampaigns/useSwaprSingleSidedStakeCampaigns'
 import { Switch } from '../../components/Switch'
 import { unwrappedToken } from '../../utils/wrappedCurrency'
@@ -130,7 +130,7 @@ function Title({
                   <CurrencyLogo currency={filteredToken} size="21px" />
                 </Box>
               )}
-              <Text mr="8px" fontWeight="600" fontSize="16px" lineHeight="20px">
+              <Text mr="8px" fontWeight="600" fontSize="16px" lineHeight="20px" data-testid="all-token-list">
                 {filteredToken ? unwrappedToken(filteredToken)?.symbol : 'ALL'}
               </Text>
               <Box>
@@ -148,12 +148,12 @@ function Title({
 
           <TransperentButton as={Link} to="/create">
             <Plus size="16" />
-            <Text marginLeft="5px" fontWeight="500" fontSize="12px">
+            <Text marginLeft="5px" fontWeight="500" fontSize="12px" data-testid="create-pair">
               CREATE PAIR
             </Text>
           </TransperentButton>
         </Flex>
-        <Flex>
+        <Flex data-testid="campaigns-toggle">
           <Switch
             label="CAMPAIGNS"
             handleToggle={() =>

@@ -1,4 +1,4 @@
-import { ChainId, JSBI, Pair, Route, Token, TokenAmount, Trade, TradeType } from '@swapr/sdk'
+import { ChainId, JSBI, Pair, Percent, Route, Token, TokenAmount, TradeType, UniswapV2Trade } from '@swapr/sdk'
 import { computeTradePriceBreakdown } from './prices'
 
 describe('prices', () => {
@@ -20,7 +20,12 @@ describe('prices', () => {
     it('correct realized lp fee for single hop', () => {
       expect(
         computeTradePriceBreakdown(
-          new Trade(new Route([pair12], token1), new TokenAmount(token1, JSBI.BigInt(1000)), TradeType.EXACT_INPUT)
+          new UniswapV2Trade(
+            new Route([pair12], token1),
+            new TokenAmount(token1, JSBI.BigInt(1000)),
+            new Percent('3', '100'),
+            TradeType.EXACT_INPUT
+          )
         ).realizedLPFeeAmount
       ).toEqual(new TokenAmount(token1, JSBI.BigInt(2)))
     })
@@ -28,9 +33,10 @@ describe('prices', () => {
     it.skip('correct realized lp fee for double hop', () => {
       expect(
         computeTradePriceBreakdown(
-          new Trade(
+          new UniswapV2Trade(
             new Route([pair12, pair23], token1),
             new TokenAmount(token1, JSBI.BigInt(1000)),
+            new Percent('3', '100'),
             TradeType.EXACT_INPUT
           )
         ).realizedLPFeeAmount

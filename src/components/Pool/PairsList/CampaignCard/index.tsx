@@ -13,7 +13,7 @@ import { unwrappedToken } from '../../../../utils/wrappedCurrency'
 
 import { Card, Flex } from 'rebass'
 
-import CurrencyLogo from '../../../CurrencyLogo'
+import { CurrencyLogo } from '../../../CurrencyLogo'
 
 import Countdown from '../../../Countdown'
 import CarrotBadge from '../../../Badge/Carrot'
@@ -165,7 +165,7 @@ export function CampaignCard({
             </EllipsizedText>
           </Flex>
           <RightSection>
-            <Flex width="max-content" alignItems="center">
+            <Flex width="max-content" alignItems="center" data-testid="ended-campaign">
               <ClockSvg width={'10px'} height={'10px'} />
               <TYPE.body marginLeft="4px" fontSize="10px" fontFamily="Fira Code" fontWeight="500">
                 <Countdown

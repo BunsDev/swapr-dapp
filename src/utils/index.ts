@@ -4,7 +4,7 @@ import { AddressZero } from '@ethersproject/constants'
 import { JsonRpcSigner, Web3Provider, JsonRpcProvider } from '@ethersproject/providers'
 import { BigNumber } from '@ethersproject/bignumber'
 import { abi as IDXswapRouterABI } from '@swapr/periphery/build/IDXswapRouter.json'
-import { ChainId, JSBI, Percent, Token, CurrencyAmount, Currency, Pair, RoutablePlatform } from '@swapr/sdk'
+import { ChainId, JSBI, Percent, Token, CurrencyAmount, Currency, Pair, UniswapV2RoutablePlatform } from '@swapr/sdk'
 import { TokenAddressMap } from '../state/lists/hooks'
 import Decimal from 'decimal.js-light'
 import { commify } from 'ethers/lib/utils'
@@ -126,7 +126,7 @@ export function getContract(address: string, ABI: any, library: Web3Provider, ac
 export function getRouterContract(
   chainId: ChainId,
   library: Web3Provider,
-  platform: RoutablePlatform,
+  platform: UniswapV2RoutablePlatform,
   account?: string
 ): Contract {
   return getContract(
@@ -200,8 +200,15 @@ export const switchOrAddNetwork = (networkDetails?: NetworkDetails, account?: st
     })
 }
 
-export const StyledConnectedIcon = styled(ConnectedSvg)<{ width?: string, padding?: string, margin?: string }>`
-  min-width: ${ props => (props.width ? props.width : "22px")};
-  padding: ${ props => (props.padding ? props.padding : "0")};
-  margin: ${ props => (props.margin ? props.margin : "0")};
+export const StyledConnectedIcon = styled(ConnectedSvg)<{ width?: string; padding?: string; margin?: string }>`
+  min-width: ${props => (props.width ? props.width : '22px')};
+  padding: ${props => (props.padding ? props.padding : '0')};
+  margin: ${props => (props.margin ? props.margin : '0')};
 `
+export const normalizeInputValue = (val: string, strictFormat?: boolean) => {
+  const normalizedValue = val.replace(/^0+(?=\d+)/, '').replace(/^\./, '0.')
+
+  return strictFormat
+    ? normalizedValue.replace(/^([\d,]+)$|^([\d,]+)\.0*$|^([\d,]+\.[0-9]*?)0*$/, '$1$2$3')
+    : normalizedValue
+}
