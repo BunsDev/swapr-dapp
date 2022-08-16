@@ -107,7 +107,7 @@
     "@openapitools/openapi-generator-cli": "^2.5.1",
     "@react-theming/storybook-addon": "^1.1.6",
     "@simbathesailor/use-what-changed": "^2.0.0",
-    "@storybook/addon-actions": "^6.5.9",
+    "@storybook/addon-actions": "^6.5.10",
     "@storybook/addon-docs": "^6.5.9",
     "@storybook/addon-essentials": "^6.5.9",
     "@storybook/addon-interactions": "^6.5.9",
