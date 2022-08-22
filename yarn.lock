@@ -69,10 +69,10 @@
     ts-node "^10.2.1"
     typechain "7.0.0"
 
-"@arbitrum/sdk@^2.0.1":
-  version "2.0.12"
-  resolved "https://registry.yarnpkg.com/@arbitrum/sdk/-/sdk-2.0.12.tgz#9f4ca2d2ed9a0013bb682d02b83653ff830648e2"
-  integrity sha512-mb5oBQtyIl6afJW8luXKUDn6fNkwqsz/xNrDOhxj6G99jY+Rtqw/KlpEaqg6lRI/vWT1/EWRK3ikN6LkOg5Z+A==
+"@arbitrum/sdk@^2.0.13":
+  version "2.0.13"
+  resolved "https://registry.yarnpkg.com/@arbitrum/sdk/-/sdk-2.0.13.tgz#6c9c60c2fab0a6c1fd4fefc82fbb27e16ef0c8b1"
+  integrity sha512-C/ckSzQkX4e8SKAY5Lz3yfakM5Aj6sA2mB9Q7cvZR/NFsFb0R95DiA6l1VMFT6Z1S1v8W936x4j9rLsJaFd/gg==
   dependencies:
     "@arbitrum/sdk-classic" "npm:@arbitrum/sdk@1.1.13"
     "@arbitrum/sdk-nitro" "npm:@arbitrum/sdk@3.0.0-beta.8"
