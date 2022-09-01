@@ -5284,10 +5284,10 @@
   dependencies:
     typescript "^3.9.5"
 
-"@swapr/periphery@^0.3.22":
-  version "0.3.22"
-  resolved "https://registry.yarnpkg.com/@swapr/periphery/-/periphery-0.3.22.tgz#d1c084e9cb186c44e24ee0757843d595e315de95"
-  integrity sha512-0iBH+BYz+KHb9XOj+jO6jgU9IG1uzvb9+VH0yq8GMYTxsVcUm1eR0TdJWet6/PbxfoROZtIAwwgrtxWpxBL8yg==
+"@swapr/periphery@^0.3.22", "@swapr/periphery@^0.3.23":
+  version "0.3.23"
+  resolved "https://registry.yarnpkg.com/@swapr/periphery/-/periphery-0.3.23.tgz#250090655cf9f02a485890763334e5101c0b3a4f"
+  integrity sha512-6ihqkdWkiEaVJ+hM4vBreoMA9er6RM+iD8T54tOfCvcR50aWbgRlfxTzFY6iZjR3IwAqph3ww/+QcJXv+mLemw==
   dependencies:
     "@swapr/core" "^0.3.17"
 
